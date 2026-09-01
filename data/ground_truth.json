@@ -1,0 +1,912 @@
+[
+  {
+    "bank_txn_id": "BNK-20260306-1001",
+    "ledger_entry_ids": [
+      "LEDG-001001"
+    ],
+    "settlement_id": "NPCI-SET-01001",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1002",
+    "ledger_entry_ids": [
+      "LEDG-001002"
+    ],
+    "settlement_id": "NPCI-SET-01002",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1003",
+    "ledger_entry_ids": [
+      "LEDG-001003"
+    ],
+    "settlement_id": "NPCI-SET-01003",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1004",
+    "ledger_entry_ids": [
+      "LEDG-001004"
+    ],
+    "settlement_id": "NPCI-SET-01004",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1005",
+    "ledger_entry_ids": [
+      "LEDG-001005"
+    ],
+    "settlement_id": "NPCI-SET-01005",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1006",
+    "ledger_entry_ids": [
+      "LEDG-001006"
+    ],
+    "settlement_id": "NPCI-SET-01006",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1007",
+    "ledger_entry_ids": [
+      "LEDG-001007"
+    ],
+    "settlement_id": "NPCI-SET-01007",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1008",
+    "ledger_entry_ids": [
+      "LEDG-001008"
+    ],
+    "settlement_id": "NPCI-SET-01008",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1009",
+    "ledger_entry_ids": [
+      "LEDG-001009"
+    ],
+    "settlement_id": "NPCI-SET-01009",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1010",
+    "ledger_entry_ids": [
+      "LEDG-001010"
+    ],
+    "settlement_id": "NPCI-SET-01010",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1011",
+    "ledger_entry_ids": [
+      "LEDG-001011"
+    ],
+    "settlement_id": "NPCI-SET-01011",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1012",
+    "ledger_entry_ids": [
+      "LEDG-001012"
+    ],
+    "settlement_id": "NPCI-SET-01012",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1013",
+    "ledger_entry_ids": [
+      "LEDG-001013"
+    ],
+    "settlement_id": "NPCI-SET-01013",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1014",
+    "ledger_entry_ids": [
+      "LEDG-001014"
+    ],
+    "settlement_id": "NPCI-SET-01014",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1015",
+    "ledger_entry_ids": [
+      "LEDG-001015"
+    ],
+    "settlement_id": "NPCI-SET-01015",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1016",
+    "ledger_entry_ids": [
+      "LEDG-001016"
+    ],
+    "settlement_id": "NPCI-SET-01016",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1017",
+    "ledger_entry_ids": [
+      "LEDG-001017"
+    ],
+    "settlement_id": "NPCI-SET-01017",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1018",
+    "ledger_entry_ids": [
+      "LEDG-001018"
+    ],
+    "settlement_id": "NPCI-SET-01018",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1019",
+    "ledger_entry_ids": [
+      "LEDG-001019"
+    ],
+    "settlement_id": "NPCI-SET-01019",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1020",
+    "ledger_entry_ids": [
+      "LEDG-001020"
+    ],
+    "settlement_id": "NPCI-SET-01020",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1021",
+    "ledger_entry_ids": [
+      "LEDG-001021"
+    ],
+    "settlement_id": "NPCI-SET-01021",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1022",
+    "ledger_entry_ids": [
+      "LEDG-001022"
+    ],
+    "settlement_id": "NPCI-SET-01022",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1023",
+    "ledger_entry_ids": [
+      "LEDG-001023"
+    ],
+    "settlement_id": "NPCI-SET-01023",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1024",
+    "ledger_entry_ids": [
+      "LEDG-001024"
+    ],
+    "settlement_id": "NPCI-SET-01024",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1025",
+    "ledger_entry_ids": [
+      "LEDG-001025"
+    ],
+    "settlement_id": "NPCI-SET-01025",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1026",
+    "ledger_entry_ids": [
+      "LEDG-001026"
+    ],
+    "settlement_id": "NPCI-SET-01026",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1027",
+    "ledger_entry_ids": [
+      "LEDG-001027"
+    ],
+    "settlement_id": "NPCI-SET-01027",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1028",
+    "ledger_entry_ids": [
+      "LEDG-001028"
+    ],
+    "settlement_id": "NPCI-SET-01028",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1029",
+    "ledger_entry_ids": [
+      "LEDG-001029"
+    ],
+    "settlement_id": "NPCI-SET-01029",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1030",
+    "ledger_entry_ids": [
+      "LEDG-001030"
+    ],
+    "settlement_id": "NPCI-SET-01030",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1031",
+    "ledger_entry_ids": [
+      "LEDG-001031"
+    ],
+    "settlement_id": "NPCI-SET-01031",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1032",
+    "ledger_entry_ids": [
+      "LEDG-001032"
+    ],
+    "settlement_id": "NPCI-SET-01032",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1033",
+    "ledger_entry_ids": [
+      "LEDG-001033"
+    ],
+    "settlement_id": "NPCI-SET-01033",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1034",
+    "ledger_entry_ids": [
+      "LEDG-001034"
+    ],
+    "settlement_id": "NPCI-SET-01034",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1035",
+    "ledger_entry_ids": [
+      "LEDG-001035"
+    ],
+    "settlement_id": "NPCI-SET-01035",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1036",
+    "ledger_entry_ids": [
+      "LEDG-001036"
+    ],
+    "settlement_id": "NPCI-SET-01036",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1037",
+    "ledger_entry_ids": [
+      "LEDG-001037"
+    ],
+    "settlement_id": "NPCI-SET-01037",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1038",
+    "ledger_entry_ids": [
+      "LEDG-001038"
+    ],
+    "settlement_id": "NPCI-SET-01038",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1039",
+    "ledger_entry_ids": [
+      "LEDG-001039"
+    ],
+    "settlement_id": "NPCI-SET-01039",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260306-1040",
+    "ledger_entry_ids": [
+      "LEDG-001040"
+    ],
+    "settlement_id": "NPCI-SET-01040",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1041",
+    "ledger_entry_ids": [
+      "LEDG-001041"
+    ],
+    "settlement_id": "NPCI-SET-01041",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1042",
+    "ledger_entry_ids": [
+      "LEDG-001042"
+    ],
+    "settlement_id": "NPCI-SET-01042",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1043",
+    "ledger_entry_ids": [
+      "LEDG-001043"
+    ],
+    "settlement_id": "NPCI-SET-01043",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1044",
+    "ledger_entry_ids": [
+      "LEDG-001044"
+    ],
+    "settlement_id": "NPCI-SET-01044",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1045",
+    "ledger_entry_ids": [
+      "LEDG-001045"
+    ],
+    "settlement_id": "NPCI-SET-01045",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1046",
+    "ledger_entry_ids": [
+      "LEDG-001046"
+    ],
+    "settlement_id": "NPCI-SET-01046",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1047",
+    "ledger_entry_ids": [
+      "LEDG-001047"
+    ],
+    "settlement_id": "NPCI-SET-01047",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [],
+    "is_orphan": false,
+    "notes": "Standard clean match with matching UTR and expected fee"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1048",
+    "ledger_entry_ids": [
+      "LEDG-001048"
+    ],
+    "settlement_id": "NPCI-SET-01048",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "fee_deduction"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: fee_deduction"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1049",
+    "ledger_entry_ids": [
+      "LEDG-001049"
+    ],
+    "settlement_id": "NPCI-SET-01049",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "timing_lag"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: timing_lag"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1050",
+    "ledger_entry_ids": [
+      "LEDG-001050"
+    ],
+    "settlement_id": "NPCI-SET-01050",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "timing_lag"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: timing_lag"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1051",
+    "ledger_entry_ids": [
+      "LEDG-001051"
+    ],
+    "settlement_id": "NPCI-SET-01051",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "partial_refund"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: partial_refund"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1052",
+    "ledger_entry_ids": [
+      "LEDG-001052"
+    ],
+    "settlement_id": "NPCI-SET-01052",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "rounding_difference"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: rounding_difference"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1053",
+    "ledger_entry_ids": [
+      "LEDG-001053"
+    ],
+    "settlement_id": "NPCI-SET-01053",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "reference_formatting"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: reference_formatting"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1054",
+    "ledger_entry_ids": [
+      "LEDG-001054"
+    ],
+    "settlement_id": "NPCI-SET-01054",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "duplicate_retry"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: duplicate_retry"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1055",
+    "ledger_entry_ids": [
+      "LEDG-001055",
+      "LEDG-001155"
+    ],
+    "settlement_id": "NPCI-SET-01055",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "batch_settlement"
+    ],
+    "is_orphan": false,
+    "notes": "Batch settlement of 2 ledger entries into 1 lump bank credit (\u20b98583.67)"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1056",
+    "ledger_entry_ids": [
+      "LEDG-001056"
+    ],
+    "settlement_id": "NPCI-SET-01056",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "fee_deduction"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: fee_deduction"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1057",
+    "ledger_entry_ids": [
+      "LEDG-001057"
+    ],
+    "settlement_id": "NPCI-SET-01057",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "timing_lag"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: timing_lag"
+  },
+  {
+    "bank_txn_id": "BNK-20260305-1058",
+    "ledger_entry_ids": [
+      "LEDG-001058"
+    ],
+    "settlement_id": "NPCI-SET-01058",
+    "expected_status": "matched_with_discrepancy",
+    "expected_discrepancies": [
+      "timing_lag"
+    ],
+    "is_orphan": false,
+    "notes": "Discrepancy test case: timing_lag"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1059",
+    "ledger_entry_ids": [
+      "LEDG-001059"
+    ],
+    "settlement_id": "NPCI-SET-01059",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [
+      "missing_utr_resolved_via_narration"
+    ],
+    "is_orphan": false,
+    "notes": "Missing UTR resolved via narration parsing (regex or LLM) + fuzzy name/amount match"
+  },
+  {
+    "bank_txn_id": "BNK-20260303-1060",
+    "ledger_entry_ids": [
+      "LEDG-001060"
+    ],
+    "settlement_id": "NPCI-SET-01060",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [
+      "missing_utr_resolved_via_narration"
+    ],
+    "is_orphan": false,
+    "notes": "Missing UTR resolved via narration parsing (regex or LLM) + fuzzy name/amount match"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1061",
+    "ledger_entry_ids": [
+      "LEDG-001061"
+    ],
+    "settlement_id": "NPCI-SET-01061",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [
+      "missing_utr_resolved_via_narration"
+    ],
+    "is_orphan": false,
+    "notes": "Missing UTR resolved via narration parsing (regex or LLM) + fuzzy name/amount match"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1062",
+    "ledger_entry_ids": [
+      "LEDG-001062"
+    ],
+    "settlement_id": "NPCI-SET-01062",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [
+      "missing_utr_resolved_via_narration"
+    ],
+    "is_orphan": false,
+    "notes": "Missing UTR resolved via narration parsing (regex or LLM) + fuzzy name/amount match"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1063",
+    "ledger_entry_ids": [
+      "LEDG-001063"
+    ],
+    "settlement_id": "NPCI-SET-01063",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [
+      "missing_utr_resolved_via_narration"
+    ],
+    "is_orphan": false,
+    "notes": "Missing UTR resolved via narration parsing (regex or LLM) + fuzzy name/amount match"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1064",
+    "ledger_entry_ids": [
+      "LEDG-001064"
+    ],
+    "settlement_id": "NPCI-SET-01064",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [
+      "missing_utr_resolved_via_narration"
+    ],
+    "is_orphan": false,
+    "notes": "Missing UTR resolved via narration parsing (regex or LLM) + fuzzy name/amount match"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1065",
+    "ledger_entry_ids": [
+      "LEDG-001065"
+    ],
+    "settlement_id": "NPCI-SET-01065",
+    "expected_status": "matched_clean",
+    "expected_discrepancies": [
+      "missing_utr_resolved_via_narration"
+    ],
+    "is_orphan": false,
+    "notes": "Missing UTR resolved via narration parsing (regex or LLM) + fuzzy name/amount match"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1066",
+    "ledger_entry_ids": [],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "bank",
+    "notes": "Bank credit with no corresponding ledger entry (true bank orphan)"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1067",
+    "ledger_entry_ids": [],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "bank",
+    "notes": "Bank credit with no corresponding ledger entry (true bank orphan)"
+  },
+  {
+    "bank_txn_id": "BNK-20260304-1068",
+    "ledger_entry_ids": [],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "bank",
+    "notes": "Bank credit with no corresponding ledger entry (true bank orphan)"
+  },
+  {
+    "bank_txn_id": "BNK-20260302-1069",
+    "ledger_entry_ids": [],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "bank",
+    "notes": "Bank credit with no corresponding ledger entry (true bank orphan)"
+  },
+  {
+    "bank_txn_id": "BNK-20260301-1070",
+    "ledger_entry_ids": [],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "bank",
+    "notes": "Bank credit with no corresponding ledger entry (true bank orphan)"
+  },
+  {
+    "bank_txn_id": null,
+    "ledger_entry_ids": [
+      "LEDG-001066"
+    ],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "ledger",
+    "notes": "Ledger entry marked pending/settled but never received in bank (true ledger orphan)"
+  },
+  {
+    "bank_txn_id": null,
+    "ledger_entry_ids": [
+      "LEDG-001067"
+    ],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "ledger",
+    "notes": "Ledger entry marked pending/settled but never received in bank (true ledger orphan)"
+  },
+  {
+    "bank_txn_id": null,
+    "ledger_entry_ids": [
+      "LEDG-001068"
+    ],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "ledger",
+    "notes": "Ledger entry marked pending/settled but never received in bank (true ledger orphan)"
+  },
+  {
+    "bank_txn_id": null,
+    "ledger_entry_ids": [
+      "LEDG-001069"
+    ],
+    "settlement_id": null,
+    "expected_status": "exception",
+    "expected_discrepancies": [
+      "unreconciled_orphan"
+    ],
+    "is_orphan": true,
+    "orphan_side": "ledger",
+    "notes": "Ledger entry marked pending/settled but never received in bank (true ledger orphan)"
+  },
+  {
+    "bank_txn_id": null,
+    "ledger_entry_ids": [
+      "LEDG-001070"
+    ],
+    "settlement_id": null,
+    "expected_status": "expected_non_match",
+    "expected_discrepancies": [
+      "status_failed"
+    ],
+    "is_orphan": false,
+    "orphan_side": null,
+    "notes": "Transaction failed at payment gateway - correctly expected not to settle"
+  },
+  {
+    "bank_txn_id": null,
+    "ledger_entry_ids": [
+      "LEDG-001071"
+    ],
+    "settlement_id": null,
+    "expected_status": "expected_non_match",
+    "expected_discrepancies": [
+      "status_failed"
+    ],
+    "is_orphan": false,
+    "orphan_side": null,
+    "notes": "Transaction failed at payment gateway - correctly expected not to settle"
+  },
+  {
+    "bank_txn_id": null,
+    "ledger_entry_ids": [
+      "LEDG-001072"
+    ],
+    "settlement_id": null,
+    "expected_status": "expected_non_match",
+    "expected_discrepancies": [
+      "status_failed"
+    ],
+    "is_orphan": false,
+    "orphan_side": null,
+    "notes": "Transaction failed at payment gateway - correctly expected not to settle"
+  }
+]
