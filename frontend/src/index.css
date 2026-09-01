@@ -344,6 +344,43 @@ pre,
   will-change: transform, opacity;
 }
 
+/* Linear / Raycast Cursor-Tracking Spotlight Card */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.spotlight-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(450px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(115, 120, 255, 0.08), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
+/* Animated Flow Particle Line */
+@keyframes flowPulse {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.flow-conduit-line {
+  stroke-dasharray: 6 6;
+  animation: flowPulse 1.2s linear infinite;
+}
+
 .card-title {
   font-size: 15px;
   font-weight: 800;

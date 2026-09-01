@@ -356,7 +356,12 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
                   whileHover={{ y: -5, scale: 1.015 }}
                   whileTap={{ scale: 0.985 }}
                   onClick={() => setSelectedTxn(t)}
-                  className="card"
+                  onMouseMove={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    e.currentTarget.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+                    e.currentTarget.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+                  }}
+                  className="card spotlight-card"
                   style={{
                     cursor: 'pointer',
                     padding: '18px',

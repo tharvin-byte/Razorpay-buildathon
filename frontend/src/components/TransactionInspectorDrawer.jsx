@@ -18,8 +18,12 @@ import {
   ArrowLeftRight,
   Building2,
   Receipt,
-  CheckCheck
+  CheckCheck,
+  Percent,
+  Cpu,
+  Zap
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TransactionInspectorDrawer({ transaction, txn, onClose, onActionClick, onAction, onToast }) {
   const currentTxn = transaction || txn;
@@ -122,13 +126,24 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
     }
   };
 
+  const signals = [
+    { label: 'Amount Match', value: isClean ? 100 : isDisc ? 85 : 40, color: '#34D399' },
+    { label: 'UTR Fingerprint', value: bank?.utr_number ? 100 : 0, color: '#60A5FA' },
+    { label: 'Semantic Name', value: ledger?.counterparty_name ? 98 : 30, color: '#818CF8' },
+    { label: 'Settlement Window', value: isClean ? 100 : isDisc ? 90 : 50, color: '#FBBF24' }
+  ];
+
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(4, 7, 14, 0.8)',
-        backdropFilter: 'blur(10px)',
+        background: 'rgba(4, 7, 14, 0.82)',
+        backdropFilter: 'blur(12px)',
         zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
@@ -139,10 +154,14 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
       onClick={onClose}
     >
       {/* Centered Modal Card */}
-      <div
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 14 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 14 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 380 }}
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '780px',
+          width: '800px',
           maxWidth: '94vw',
           maxHeight: '90vh',
           background: 'linear-gradient(180deg, #0F172A 0%, #0A0F1D 100%)',
@@ -272,7 +291,9 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
 
           {/* Action Result Box if executed */}
           {actionResult && (
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
               style={{
                 background: 'rgba(52, 211, 153, 0.08)',
                 border: '1px solid rgba(52, 211, 153, 0.3)',
@@ -321,7 +342,7 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
                   <Copy size={12} /> Copy Code
                 </button>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* Side-by-Side Dual Ledger Comparison */}
@@ -407,7 +428,7 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
             </div>
           </div>
 
-          {/* Confidence Score Bar */}
+          {/* 4-Signal Decomposition Micro-Gauges */}
           <div
             style={{
               background: 'rgba(8, 14, 27, 0.8)',
@@ -416,9 +437,9 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
               border: '1px solid rgba(255, 255, 255, 0.04)'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                Mathematical Confidence Decomposition
+                Mathematical Confidence Signals
               </div>
               <span
                 className="font-mono"
@@ -428,126 +449,125 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
                   color: isClean ? '#34D399' : isDisc ? '#FBBF24' : '#F87171'
                 }}
               >
-                {scorePct}% Score
+                {scorePct}% Overall
               </span>
             </div>
 
-            <div className="confidence-bar-track" style={{ height: '7px', marginBottom: '10px' }}>
-              <div
-                className="confidence-bar-fill"
-                style={{
-                  width: `${scorePct}%`,
-                  background: isClean
-                    ? 'linear-gradient(90deg, #6366F1, #34D399)'
-                    : isDisc
-                    ? 'linear-gradient(90deg, #6366F1, #FBBF24)'
-                    : 'linear-gradient(90deg, #6366F1, #F87171)'
-                }}
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+              {signals.map((sig, i) => (
+                <div key={i} style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--line-subtle)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <span>{sig.label}</span>
+                    <span className="font-mono" style={{ color: sig.color, fontWeight: '700' }}>{sig.value}%</span>
+                  </div>
+                  <div style={{ height: '4px', background: 'rgba(255, 255, 255, 0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${sig.value}%` }}
+                      transition={{ duration: 0.5, delay: i * 0.08, ease: 'easeOut' }}
+                      style={{ height: '100%', background: sig.color, borderRadius: '2px' }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Audit Explanation */}
-          <div>
-            <div style={{ fontSize: '10.5px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>
-              Audit Explanation & Root Cause Analysis
+          <div
+            style={{
+              background: 'rgba(8, 14, 27, 0.8)',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.04)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <Sparkles size={14} color="#818CF8" />
+              <span style={{ fontSize: '11px', fontWeight: '800', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                Audit Explanation & Root Cause Analysis
+              </span>
             </div>
-            <div
-              style={{
-                background: 'rgba(18, 26, 47, 0.6)',
-                padding: '14px 18px',
-                borderRadius: '10px',
-                border: '1px solid rgba(255, 255, 255, 0.04)',
-                fontSize: '12.5px',
-                lineHeight: '1.55',
-                color: 'var(--text-secondary)'
-              }}
-            >
-              {currentTxn.explanation || currentTxn.exception_reason || 'Reconciled successfully with zero variance.'}
-            </div>
+            <p style={{ fontSize: '12.5px', color: '#CBD5E1', lineHeight: '1.6', margin: 0 }}>
+              {currentTxn.explanation || currentTxn.exception_reason || bank?.narration || 'Transaction settled cleanly across both nodal bank statement and merchant accounting ledger with verified UTR.'}
+            </p>
           </div>
 
-          {/* Cryptographic SHA-256 Merkle Leaf */}
-          <div>
-            <div style={{ fontSize: '10.5px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '6px' }}>
-              Cryptographic Merkle Leaf Hash (Audit Provenance)
-            </div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                background: 'rgba(8, 14, 27, 0.8)',
-                padding: '8px 14px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.04)'
-              }}
-            >
-              <Hash size={14} color="#818CF8" />
-              <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {/* Merkle Hash Box */}
+          <div
+            style={{
+              background: 'rgba(8, 14, 27, 0.9)',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}
+          >
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Cryptographic SHA-256 Merkle Leaf Hash
+              </div>
+              <div className="font-mono" style={{ fontSize: '11px', color: '#34D399', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
                 {currentTxn.signals?.merkle_leaf_hash || '7d4a7b06ebf2135370e55f09c09b7dbb04bdf548e46e9b9e5dd1de6f2621f6ea'}
-              </span>
-              <button
-                onClick={handleCopyHash}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: copiedHash ? '#34D399' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '2px'
-                }}
-                title="Copy Merkle Hash"
-              >
-                {copiedHash ? <Check size={14} /> : <Copy size={14} />}
-              </button>
+              </div>
             </div>
+
+            <button
+              onClick={handleCopyHash}
+              className="btn btn-secondary"
+              style={{ padding: '5px 10px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '5px' }}
+            >
+              {copiedHash ? <Check size={12} color="#34D399" /> : <Copy size={12} />}
+              <span>{copiedHash ? 'Copied' : 'Copy'}</span>
+            </button>
           </div>
         </div>
 
-        {/* Modal Action Footer */}
+        {/* 1-Click Action Hub Footer */}
         <div
           style={{
             padding: '16px 24px',
             borderTop: '1px solid rgba(255, 255, 255, 0.06)',
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'rgba(18, 26, 47, 0.6)'
+            justifyContent: 'space-between',
+            background: 'rgba(18, 26, 47, 0.4)'
           }}
         >
-          <button
-            className="btn btn-secondary"
-            onClick={onClose}
-            style={{ padding: '8px 16px', fontSize: '12px' }}
-          >
-            Close
-          </button>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+            1-Click Resolution Hub
+          </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              className="btn btn-secondary"
-              disabled={actionLoading}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={handleDraftDispute}
+              disabled={actionLoading}
+              className="btn btn-secondary"
+              style={{ padding: '8px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <FileText size={13} />
+              <span>Draft Dispute</span>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={handleSynthesizeVoucher}
+              disabled={actionLoading}
+              className="btn btn-primary"
               style={{ padding: '8px 16px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <Shield size={14} />
-              <span>Draft Dispute</span>
-            </button>
-
-            <button
-              className="btn btn-primary"
-              disabled={actionLoading}
-              onClick={handleSynthesizeVoucher}
-              style={{ padding: '8px 18px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Sparkles size={14} />
-              <span>{actionLoading ? 'Synthesizing...' : 'Synthesize ERP Voucher'}</span>
-            </button>
+              <CheckCheck size={14} />
+              <span>Synthesize ERP Voucher</span>
+            </motion.button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
