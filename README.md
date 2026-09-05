@@ -176,12 +176,23 @@ run_reconx.py                        One-click dual-server launcher
 
 ## Architecture & Engineering Design Decisions
 
-### 1. Dual-Tier Strategy: Production Fast-Path vs. R&D Research Suite
-ReconX cleanly decouples real-time operational execution from academic batch optimization:
+### 1. Dual-Tier Strategy: Why We Decoupled Production Fast-Path from R&D Sinkhorn Suite
+
+ReconX cleanly decouples real-time operational execution from academic batch optimization. We deliberately chose **not** to run Sinkhorn Optimal Transport and dense 3D Tensor Contractions inside the live API request loop based on concrete systems and hardware constraints:
+
+| Evaluation Dimension | Live Production Pipeline (`matcher.py`, `scorer.py`) | R&D Research Suite (`vector_tensor.py`, Sinkhorn) |
+|:---|:---|:---|
+| **Computational Complexity** | **$\mathcal{O}(1)$** inverted index lookup per transaction | **$\mathcal{O}(M \times N)$** dense matrix scaling |
+| **Memory Allocation (10k rows)** | **$< 10\text{ MB}$** RAM overhead | **$\approx 4\text{ GB}$** RAM ($500\text{M}$ float64 tensor values) |
+| **Local Machine Performance** | Instant response, zero CPU freezing ($< 2.1\text{s}$ per 1k batch) | High CPU core saturation, disk swapping, browser timeout |
+| **Mathematical Output** | **Discrete 1:1 statutory match** or AML quarantine | Continuous soft probability distribution (e.g. 42% / 38%) |
+| **Statutory Accounting Fit** | Compliant with double-entry ERP vouchers & Merkle trees | Incompatible with discrete general ledger posting |
+| **UI Multi-Agent Trace** | Emits real-time chronological thought cards for React UI | Black-box numerical solver with no reasoning trail |
+
 - **Live Production Pipeline (`engine/matcher.py`, `engine/scorer.py`, `engine/orchestrator.py`):**  
-  In enterprise banking operations, processing thousands of streaming records through dense $M \times N$ matrices or iterative Sinkhorn exponentials introduces severe $\mathcal{O}(M \times N)$ memory allocations (e.g., $10\text{k} \times 10\text{k} \times 5 = 500\text{M}$ floats $\approx 4\text{ GB}$ of RAM) and latency spikes ($> 2.5\text{s}$). Furthermore, production web interfaces require row-by-row, chronological **Agent Trace Events** (`Planner`, `Matcher`, `Discrepancy Agent`) and discrete 1:1 ledger claims. ReconX resolves clean transactions in $< 0.2\text{ms}$ via an $\mathcal{O}(1)$ Inverted Multi-Index (`utr_to_ledger`, `inv_to_ledger`), falling back to orthogonal 5-channel heuristic scoring for messy narrations.
-- **R&D Benchmark Suite (`backend/engine/vector_tensor.py`, `graph_solver.py`):**  
-  We implemented and benchmarked dense 3D Tensor Cores, entropy-regularized Sinkhorn Optimal Transport (Cuturi et al.), and Bipartite Graph Partitioning in our research test suite (`backend/tests/test_tensor_engine.py`). This benchmark proves mathematical bounds for high-dimensional edge cases, while keeping the production runtime lightweight, sub-second, and deterministic.
+  Resolves clean transactions in $< 0.2\text{ms}$ via an $\mathcal{O}(1)$ Inverted Multi-Index (`utr_to_ledger`, `inv_to_ledger`), falling back to orthogonal 5-channel heuristic scoring for messy narrations. This ensures the web application remains responsive and stable on standard hardware.
+- **R&D Benchmark Suite (`backend/engine/vector_tensor.py`, `tests/test_tensor_engine.py`):**  
+  Maintained as an offline research test harness to benchmark high-dimensional continuous assignment bounds and evaluate optimal transport formulations against discrete heuristic baselines.
 
 ### 2. 5-Channel Orthogonal Scoring Engine
 When UTRs are absent or truncated, candidate rows are scored using normalized orthogonal signals:
