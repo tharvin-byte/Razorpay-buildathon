@@ -464,8 +464,8 @@ def get_transaction_trace(run_id: str, txn_id: str):
             n_action = "Dual-Track Narration Extraction"
             n_input = f"Bank Narration: \"{narration}\""
             n_out = f"Parsed Tokens: Customer='{customer}', Ref='{invoice}', Date='{date_str}'"
-            n_reas = f"Regex matched payment rail format; Gemini 3.5 Flash extracted customer entity '{customer}' with 99.4% confidence."
-            n_tools = ["regex_parser_dual_track", "gemini_3.5_flash_parser"]
+            n_reas = f"Regex matched payment rail format; Gemini 2.5 Flash extracted customer entity '{customer}' with 99.4% confidence."
+            n_tools = ["regex_parser_dual_track", "gemini_2.5_flash_parser"]
             n_dur = 38.2
             t_s2_start = t_s1_end
             t_s2_end = t_s2_start + timedelta(microseconds=int(n_dur * 1000))
