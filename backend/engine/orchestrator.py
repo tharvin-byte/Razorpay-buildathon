@@ -107,14 +107,29 @@ class ReconciliationOrchestrator:
         # -------------------------------------------------------------
         reconciled_dicts = []
         conf_scores = []
-        is_clean_list = []
+        
+        # Ground-Truth Binding: If independent ground_truth is provided (e.g. synthetic benchmarks),
+        # extract genuine labels. NEVER derive labels circularly from r.status!
+        gt_is_match_map = {}
+        if self.ground_truth:
+            for g in self.ground_truth:
+                b_id = g.get("bank_txn_id")
+                if b_id:
+                    # True positive if ground-truth expected clean match or discrepancy match
+                    gt_is_match_map[b_id] = g.get("expected_status") in ("matched_clean", "matched_with_discrepancy")
+
+        ground_truth_labels = [] if self.ground_truth else None
 
         for r in self.results:
             conf_scores.append(r.confidence_score)
-            is_clean_list.append(r.status in ("matched_clean", "matched_with_discrepancy"))
+            b_id = r.bank_record.bank_txn_id if r.bank_record else r.record_id
             
+            if ground_truth_labels is not None:
+                # Genuine independent label from ground truth; defaults to False if unmapped/orphan
+                ground_truth_labels.append(gt_is_match_map.get(b_id, False))
+
             reconciled_dicts.append({
-                "bank_id": r.bank_record.bank_txn_id if r.bank_record else r.record_id,
+                "bank_id": b_id,
                 "ledger_id": r.matched_ledger_record.ledger_entry_id if r.matched_ledger_record else "",
                 "amount": r.bank_record.amount if r.bank_record else 0.0,
                 "utr": r.bank_record.utr_number if r.bank_record else "",
@@ -122,11 +137,16 @@ class ReconciliationOrchestrator:
             })
 
         self.merkle_root = MerkleAuditTree.build_merkle_root(reconciled_dicts)
-        self.calibrated_threshold = self.conformal_verifier.calibrate_threshold(
-            calibration_confidence_scores=conf_scores,
-            ground_truth_labels=is_clean_list,
-            default_fallback=self.confidence_threshold
-        )
+        
+        if ground_truth_labels is not None:
+            self.calibrated_threshold = self.conformal_verifier.calibrate_threshold(
+                calibration_confidence_scores=conf_scores,
+                ground_truth_labels=ground_truth_labels,
+                default_fallback=self.confidence_threshold
+            )
+        else:
+            # Unlabelled real-world run: cannot calculate independent conformal risk without labels
+            self.calibrated_threshold = None
 
         self.is_completed = True
         return self.results

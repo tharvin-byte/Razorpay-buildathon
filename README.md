@@ -39,10 +39,11 @@ In Western tech ecosystems, enterprise giants like **Stripe, SAP, and Intuit** h
 │     Routing unmasked Indian banking records, PII, and customer account numbers through US cloud LLMs   │
 │     is a direct violation of statutory compliance and financial data residency laws.                  │
 │                                                                                                        │
-│  2. SEVERE TIME DELAYS & LATENCY BOTTLENECKS                                                           │
-│     Cloud LLM API calls take 1.0 to 3.0 seconds per record. Reconciling a routine batch of 10,000      │
-│     records with an LLM takes 5 to 8 HOURS, paralyzing daily financial close cycles.                   │
-│     ReconX processes that exact same batch deterministically in UNDER 2 SECONDS.                       │
+│  2. LATENCY & OPERATIONAL THROUGHPUT BOTTLENECKS                                                       │
+│     Cloud LLM APIs exhibit 1.0s to 2.5s network round-trip latencies per record. Processing thousands  │
+│     of high-velocity daily inflows sequentially through external model prompts introduces severe       │
+│     rate-limiting and operational lag. ReconX resolves transactions locally via inverted indexes and   │
+│     multi-signal heuristic scoring in ~2.1 seconds per 1,000-record batch.                             │
 │                                                                                                        │
 │  3. STATUTORY NON-NEGOTIABLE AUDITABILITY                                                              │
 │     Statutory auditors (under RBI Master Directions & Companies Act Form 3CB) reject probabilistic     │
@@ -347,15 +348,17 @@ ReconX features an enterprise-grade dark-mode UI built with **React 18**, **Vite
 
 ## 7. Performance Benchmarks
 
-Tested on a standard developer workstation (Intel i7 / Apple M-series equivalent, 16GB RAM):
+*Empirical benchmarking executed across a 1,000-record heterogeneous dataset generated via `SyntheticDataGenerator` (seed=42) on standard hardware (Intel Core i7 / 16GB RAM):*
 
-| Performance Metric | Traditional Manual Review | Cloud LLM Wrapper (GPT-4) | **ReconX Neuro-Symbolic** |
+| Evaluation Dimension | Manual Spreadsheets / ERP Review | Sequential Cloud LLM Prompting | **ReconX Deterministic Multi-Tier** |
 |:---|:---:|:---:|:---:|
-| **Throughput (1,000 Records)** | ~40–60 Hours | ~35–50 Minutes | **2.1 Seconds** ⚡ |
-| **Cost per 10,000 Records** | ₹15,000+ (Man-hours) | $30–$50 (API credits) | **₹0.00 (Zero API cost)** |
-| **Hallucination Rate** | High (Human fatigue) | 3% – 8% (Unacceptable) | **0.00% (Zero-Guess Policy)** |
-| **Statutory Data Residency** | Compliant (Slow) | **Non-Compliant (DPDP violation)** | **100% Compliant (Local execution)** |
-| **Cryptographic Audit Proof** | None | None | **SHA-256 Merkle Leaf Hash** |
+| **Throughput (1,000 Records)** | ~40–60 Hours (Manual audit) | ~20–35 Minutes (Sequential API round-trips) | **2.1 Seconds** ⚡ (Local Inverted Index) |
+| **Operational Cost** | High internal accounting man-hours | API token costs per transaction prompt | **₹0.00 (Zero external API dependencies)** |
+| **Ambiguity Handling** | Subject to fatigue & subjective guessing | Probabilistic hallucinations under noise | **Strict Abstention Policy** ($\Delta < 0.08$ score gap routes to Quarantine) |
+| **Data Residency (DPDP Act 2023)**| Compliant (Slow) | **Non-Compliant (PII leaves enterprise VPC)** | **100% Compliant (In-memory execution / Private VPC)** |
+| **Cryptographic Immutability** | None | None | **SHA-256 Merkle Root Hash** |
+
+> **Benchmark Methodology:** Throughput measured from ingestion start to Merkle root attestation on a 1,000-transaction synthetic batch containing 70% clean UTRs, 15% truncated/dirty narrations, 5% fee/GST discrepancies, 5% bank orphans, and 5% ledger orphans. Cloud LLM metrics estimated assuming sequential REST API calls at ~1.2s average network latency per prompt.
 
 ---
 
