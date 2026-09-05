@@ -1,11 +1,56 @@
-# ReconX — Autonomous Financial Reconciliation & Treasury Solvency Engine
+like i# ReconX — Autonomous Financial Reconciliation & Treasury Solvency Engine
 
 [![ReconX YouTube Video Demo](https://img.shields.io/badge/▶_Watch_Full_Demo_on_YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K)
 > **Direct Video Link:** [https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K](https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K)
 
-ReconX reconciles multi-source financial inflows (Nodal Bank Statements, ERP General Ledgers, and Payment Gateway Settlement feeds) at scale. A deterministic multi-tier matching engine — using an $\mathcal{O}(1)$ inverted hash index fast-path, 5-channel orthogonal scoring, and combinatorial batch netting — resolves clean matches and isolates discrepancies (MDR fees, 18% statutory GST splits, timing lags). For unresolvable or ambiguous candidate pairs ($\Delta < 0.08$), the engine **strictly abstains from probabilistic guessing** and quarantines transactions into an AML suspense registry. Autonomous action bots synthesize balanced double-entry ERP vouchers (Tally XML / Zoho JSON) and statutory NPCI Form-1 dispute letters (PSS Act 2007 §10), while every finalized decision is sealed in an immutable SHA-256 Merkle audit tree.
+ReconX reconciles multi-source financial inflows (Nodal Bank Statements, ERP General Ledgers, and Payment Gateway Settlement feeds) at scale. A deterministic multi-tier matching engine — using an $\mathcal{O}(1)$ inverted hash index fast-path, 5-channel orthogonal scoring, and combinatorial batch netting — resolves clean matches and isolates discrepancies (MDR fees, 18% statutory GST splits, timing lags). For unresolvable or ambiguous candidate pairs ($\Delta < 0.08$), the engine **strictly abstains from probabilistic guessing** and quarantines transactions into an AML suspense registry. Autonomous action bots synthesize balanced double-entry ERP vouchers (Tally XML / Zoho JSON) and statutory NPCI Form-1 dispute recovery letters (PSS Act 2007 §10), while every finalized decision is sealed in an immutable SHA-256 Merkle audit tree.
 
 This is an end-to-end **Phase 1 vertical slice**: every layer in the target architecture is implemented end-to-end with production-shaped interfaces, using high-performance local in-memory run stores and offline mathematical benchmark suites (`backend/tests/test_tensor_engine.py`), running immediately with zero external cloud dependencies or paid API keys.
+
+---
+
+## Live Pipeline Architecture
+
+```text
+┌─────────────────┐       ┌─────────────────┐       ┌─────────────────────┐
+│ Nodal Bank Feed │       │ ERP Ledger Feed │       │ Gateway Settlements │
+└────────┬────────┘       └────────┬────────┘       └──────────┬──────────┘
+         └─────────────────┬───────┴───────────────────────────┘
+                           │
+                 [ Inverted Index O(1) ]
+                 Fast-path UTR & Invoice Hash Lookup
+                           │
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+     [ Exact Match ]            [ Fuzzy / Discrepancy ]
+     Score = 1.0                NarrationParserAgent (Subword Tokens)
+             │                  5-Channel Orthogonal ScoringTool:
+             │                  • Exact UTR Hash (0.45)
+             │                  • Invoice / Order Ref (0.25)
+             │                  • Counterparty RapidFuzz (0.15)
+             │                  • Amount & MDR Kernel (0.10)
+             │                  • Date Proximity Window (0.05)
+             │                           │
+             └─────────────┬─────────────┘
+                           │
+           [ DecisionMakerAgent (1:1 Mutex) ]
+           Conflict Detector & Zero-Guessing Filter (< 8% Δ)
+                           │
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+    [ Matched / Discrepancy ]       [ Quarantined Exception ]
+    DiscrepancyDecompositionAgent   AML Suspense Registry
+    (2% MDR Fee & 18% GST Split)    (Controller Verification Required)
+             │                                   │
+             ▼                                   ▼
+    [ ERPVoucherAgent ]             [ BankDisputeAgent ]
+    Tally XML / Zoho JSON           NPCI Form-1 Letter (PSS Act 2007)
+             │                                   │
+             └─────────────┬─────────────────────┘
+                           │
+            [ SHA-256 Merkle Audit Tree ]
+            Immutable Attestation Root (64-hex)
+```
 
 ---
 
@@ -132,20 +177,29 @@ run_reconx.py                        One-click dual-server launcher
 ## Architecture & Engineering Design Decisions
 
 ### 1. Dual-Tier Strategy: Production Fast-Path vs. R&D Research Suite
-- **Production Path ($< 2.1\text{s}$ per 1k records):**  
-  In live banking operations, processing thousands of streaming records through dense 3D tensor contractions or iterative Sinkhorn matrix exponentials introduces $\mathcal{O}(M \times N)$ memory overheads and unacceptable latency spikes ($> 2.5\text{s}$). ReconX uses an ultra-low-latency $\mathcal{O}(1)$ Inverted Multi-Index (`utr_to_ledger`, `inv_to_ledger`) to resolve clean transactions in $< 0.2\text{ms}$, falling back to multi-signal heuristic scoring for fuzzy narrations.
+ReconX cleanly decouples real-time operational execution from academic batch optimization:
+- **Live Production Pipeline (`engine/matcher.py`, `engine/scorer.py`, `engine/orchestrator.py`):**  
+  In enterprise banking operations, processing thousands of streaming records through dense $M \times N$ matrices or iterative Sinkhorn exponentials introduces severe $\mathcal{O}(M \times N)$ memory allocations (e.g., $10\text{k} \times 10\text{k} \times 5 = 500\text{M}$ floats $\approx 4\text{ GB}$ of RAM) and latency spikes ($> 2.5\text{s}$). Furthermore, production web interfaces require row-by-row, chronological **Agent Trace Events** (`Planner`, `Matcher`, `Discrepancy Agent`) and discrete 1:1 ledger claims. ReconX resolves clean transactions in $< 0.2\text{ms}$ via an $\mathcal{O}(1)$ Inverted Multi-Index (`utr_to_ledger`, `inv_to_ledger`), falling back to orthogonal 5-channel heuristic scoring for messy narrations.
 - **R&D Benchmark Suite (`backend/engine/vector_tensor.py`, `graph_solver.py`):**  
-  We implemented and benchmarked dense 3D Tensor Cores, entropy-regularized Sinkhorn Optimal Transport (Cuturi et al.), and Bipartite Graph Partitioning (SciPy CSR connected components) in our research test suite (`backend/tests/test_tensor_engine.py`) to prove mathematical bounds for high-dimensional edge cases.
+  We implemented and benchmarked dense 3D Tensor Cores, entropy-regularized Sinkhorn Optimal Transport (Cuturi et al.), and Bipartite Graph Partitioning in our research test suite (`backend/tests/test_tensor_engine.py`). This benchmark proves mathematical bounds for high-dimensional edge cases, while keeping the production runtime lightweight, sub-second, and deterministic.
 
-### 2. Zero-Guessing Safety Invariant ($\Delta < 0.08$)
+### 2. 5-Channel Orthogonal Scoring Engine
+When UTRs are absent or truncated, candidate rows are scored using normalized orthogonal signals:
+- **Exact UTR Match ($w_0 = 0.45$):** Binary match on alphanumeric reference tokens.
+- **Invoice / Order Ref ($w_1 = 0.25$):** Substring and fuzzy token matching against narration metadata.
+- **Counterparty Name ($w_2 = 0.15$):** RapidFuzz token-sort similarity against merchant customer directories.
+- **Amount & MDR Kernel ($w_3 = 0.10$):** Gaussian tolerance kernel accounting for 0.5%–2.5% MDR gateway deductions and refunds.
+- **Date Decay Proximity ($w_4 = 0.05$):** Exponential decay within a 3-day statutory settlement window.
+
+### 3. Zero-Guessing Safety Invariant ($\Delta < 0.08$)
 In financial auditing, **a false positive match is 10x more destructive than an un-reconciled item**. When competing ledger candidates have confidence scores separated by less than 8%:
 $$\text{If } S_1 \ge \tau \quad\land\quad (S_1 - S_2) < 0.08 \quad\land\quad S_2 > 0.65 \implies \text{Quarantine}$$
 The engine strictly abstains from guessing and routes the record to an AML Suspense Registry with transparent diagnostic root causes.
 
-### 3. Non-Circular Conformal Risk Profiling
+### 4. Non-Circular Conformal Risk Profiling
 Conformal calibration requires independent ground truth. ReconX binds directly to synthetic benchmark ground truth (`gt_is_match_map`) when available to compute mathematically sound finite-sample risk bounds ($\alpha \le 0.001$). On raw, unlabelled real-world CSV uploads where ground truth does not exist, the engine marks the calibration as `None` rather than synthesizing circular self-referential labels.
 
-### 4. Conservation of Escrow Solvency Invariant
+### 5. Conservation of Escrow Solvency Invariant
 $$\sum \text{Bank Inflows} - \sum \text{Settled Ledger Outflows} \equiv \Delta \text{Nodal Escrow Balance} \quad (\pm ₹1.00 \text{ rounding})$$
 Every transaction state transition is sealed in a binary SHA-256 Merkle Audit Tree (`MerkleAuditTree.build_merkle_root`), producing a 64-hex root hash that makes post-hoc ledger manipulation mathematically impossible.
 
