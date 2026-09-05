@@ -64,73 +64,83 @@ ReconX is engineered as a **5-Plane Neuro-Symbolic Treasury Operating System**, 
 ### A. Architectural Execution Blueprint
 
 ```mermaid
-flowchart TB
-    %% Class Definitions for Enterprise Architectural Planes
-    classDef ingest fill:#0B192C,stroke:#1E3E62,stroke-width:2px,color:#E0E8F5;
-    classDef fastpath fill:#064E3B,stroke:#059669,stroke-width:2px,color:#D1FAE5;
-    classDef tensor fill:#1E1B4B,stroke:#6366F1,stroke-width:2px,color:#E0E7FF;
+flowchart TD
+    %% Class Definitions for High-Contrast Enterprise Styling
+    classDef source fill:#0B192C,stroke:#1E3E62,stroke-width:2px,color:#E0E8F5;
+    classDef agent fill:#2E1065,stroke:#8B5CF6,stroke-width:3px,color:#F3E8FF;
+    classDef fastpath fill:#064E3B,stroke:#10B981,stroke-width:2px,color:#D1FAE5;
     classDef quarantine fill:#450A0A,stroke:#EF4444,stroke-width:2px,color:#FEE2E2;
-    classDef actions fill:#78350F,stroke:#F59E0B,stroke-width:2px,color:#FEF3C7;
-    classDef audit fill:#312E81,stroke:#818CF8,stroke-width:2px,color:#EEF2FF;
-    classDef router fill:#111827,stroke:#9CA3AF,stroke-dasharray: 4 4,color:#F3F4F6;
+    classDef actionbot fill:#78350F,stroke:#F59E0B,stroke-width:2px,color:#FEF3C7;
+    classDef crypto fill:#1E293B,stroke:#A78BFA,stroke-width:2px,color:#EEF2FF;
+    classDef gate fill:#111827,stroke:#9CA3AF,stroke-dasharray: 4 4,color:#F3F4F6;
 
-    subgraph Plane1 ["PLANE 1: Heterogeneous Telemetry & Schema Invariant Ingestion"]
-        B["🏦 Nodal Bank Statement<br/>(MT940 / CAMT.053 / Core Banking CSV)"]:::ingest
-        L["📋 Internal ERP General Ledger<br/>(Order Captures & Journal Batches)"]:::ingest
-        S["💳 Payment Gateway Settlement Feed<br/>(Razorpay / Stripe Net Batches)"]:::ingest
-        NORM["⚙️ Dynamic Schema Normalizer & Sanitizer<br/>• Null-Safe Type Casting & ISO-4217 Currency Standardizer<br/>• Indian UPI/IMPS/NEFT/RTGS UTR Canonical Regex Parser<br/>• Dual 2-Source or 3-Source Auto-Harmonization"]:::ingest
-        B --> NORM
-        L --> NORM
-        S --> NORM
+    subgraph S1 ["1. HETEROGENEOUS INGESTION & NORMALIZATION PLANE"]
+        B["🏦 Nodal Bank Statement<br/>(MT940 / CAMT.053 / Core Banking CSV)"]:::source
+        L["📋 Internal ERP General Ledger<br/>(Order Captures & Journal Batches)"]:::source
+        P["💳 Payment Gateway Settlement<br/>(Razorpay / Stripe Batch Feeds)"]:::source
+        ADAPT["⚙️ Multi-Source Invariant Sanitizer<br/>• Null-Safe Type Casting & Decimal Precision<br/>• Indian UPI/IMPS/NEFT/RTGS Canonical UTR Normalizer"]:::source
+        B --> ADAPT
+        L --> ADAPT
+        P --> ADAPT
     end
 
-    subgraph Plane2 ["PLANE 2: Neuro-Symbolic Dual-Stream Matching Core (< 2ms)"]
-        ZT{"🔍 Zero-Signal Triage<br/>UTR Missing & Empty Narration?"}:::router
-        NORM --> ZT
+    subgraph S2 ["2. CORE 4-AGENT RECONCILIATION & TENSOR PIPELINE"]
+        AG1["🤖 AGENT 1: Ingestion Planner & Triage Hub<br/>• Metadata completeness & signal evaluation<br/>• Zero-Signal AML Suspense Isolation<br/>• Intelligent Fast-Path Routing (< 1.8ms)"]:::agent
+        ADAPT --> AG1
+
+        AG1 -->|Zero Signals: No UTR & Empty Text| QUAR_AML["🚨 Suspense Quarantine<br/>(AML Zero-Signal Investigation)"]:::quarantine
         
-        ZT -->|Signals Present| FP["⚡ Route A: Fast Deterministic Inverted Index<br/>• Exact Hash Indexing on Canonical UTR<br/>• Absorbs ~65% Volume in O(1) / < 0.2ms"]:::fastpath
-        ZT -->|Missing All Signals| SUSP["🚨 Suspense Quarantine<br/>(AML Zero-Signal Registry)"]:::quarantine
+        AG1 -->|Exact Canonical UTR Found| FAST["⚡ Fast-Path O(1) Inverted Index<br/>• Direct Instant Hash Index Lookup<br/>• Reconciles ~65% Volume in < 0.2ms"]:::fastpath
 
-        FP -->|Exact UTR Found| MUTEX{"🔒 1-to-1 Linear Mutex<br/>Ledger Item Available?"}:::router
-        FP -->|UTR Miss / Truncated| TENSOR["🧠 Route B: 3D Multi-Signal Tensor Core<br/>• 5-Signal Orthogonal Weights (UTR, Ref, Name, Amt, Date)<br/>• Subword Levenshtein Tokenizer for Noisy Bank Narration<br/>• Sinkhorn-Knopp Optimal Transport Matrix"]:::tensor
+        AG1 -->|Truncated UTR / Dirty Narration| AG2["🤖 AGENT 2: Narration & Semantic Parser Agent<br/>• Subword Levenshtein Tokenizer<br/>• Dual-Track Core Banking String Unraveller<br/>• Regex VPA & Invoice Number Extraction"]:::agent
 
-        TENSOR --> AMB{"⚖️ Conflict & Ambiguity Detector<br/>Top-1 vs Top-2 Delta < 8%?"}:::router
-        AMB -->|Ambiguous| QUAR["🛑 Quarantine Suspense Queue<br/>(Zero-Guessing Safety Invariant)"]:::quarantine
-        AMB -->|Confident Match| MUTEX
+        AG2 --> AG3["🤖 AGENT 3: Decision Maker & Tensor Matching Agent<br/>• 5-Signal Orthogonal Weights (UTR, Ref, Name, Amt, Date)<br/>• Sinkhorn-Knopp Optimal Transport Matrix Solver<br/>• Bipartite Graph Netting for N:1 Lump Sums"]:::agent
 
-        MUTEX -->|Claim Verified| MATCHED["✅ Fully Reconciled Record<br/>(Clean Match / Flagged Discrepancy)"]:::fastpath
-        MUTEX -->|Already Claimed| DUP["⚠️ Double-Count Collision Exception"]:::quarantine
+        FAST --> MUTEX{"🔒 1-to-1 Linear Mutex<br/>Ledger Row Available?"}:::gate
+        AG3 --> CONFLICT{"⚖️ Conflict & Ambiguity Gate<br/>Top-1 vs Top-2 Delta < 8%?"}:::gate
 
-        FP -->|No Candidate Match| BATCH["🔗 Route C: Bipartite Graph Netting<br/>• Hopcroft-Karp Subset-Sum Partitioning<br/>• Resolves N:1 Lump-Sum Payouts"]:::tensor
+        CONFLICT -->|Ambiguous: Delta < 8%| QUAR_AMB["🛑 Quarantine Suspense Registry<br/>(Zero-Guessing Safety Invariant)"]:::quarantine
+        CONFLICT -->|Confident Top Match| MUTEX
+
+        MUTEX -->|Already Claimed| COLLISION["⚠️ Double-Count Collision Exception"]:::quarantine
+        MUTEX -->|Unclaimed & Verified| RECON_OK["✅ Successfully Reconciled Pair<br/>(1-to-1 Clean Match / Variance Flagged)"]:::fastpath
+
+        RECON_OK --> AG4["🤖 AGENT 4: Discrepancy & Forensic Auditor Agent<br/>• Contractual MDR Fee (2%) + 18% GST Slicer<br/>• T+1/T+2 Clearing Float Timing Isolation<br/>• Natural Language Cash-Flow Bridge Synthesis"]:::agent
     end
 
-    subgraph Plane3 ["PLANE 3: Asymmetric Reverse-Sweep & Forensic Triage"]
-        REV["🔄 Asymmetric Reverse Sweeper<br/>(Examines All Unclaimed Ledger Entries)"]:::ingest
-        NORM -.-> REV
+    subgraph S3 ["3. ASYMMETRIC REVERSE-SWEEP & ORPHAN TRIAGE"]
+        REV["🔄 Unclaimed Ledger Reverse-Sweeper<br/>(Examines captured orders with no bank credit)"]:::source
+        ADAPT -.-> REV
         
-        GW_CHECK{"📡 Payment Gateway<br/>State Triangulation"}:::router
+        GW_CHECK{"📡 Payment Gateway<br/>State Triangulation"}:::gate
         REV --> GW_CHECK
         
-        GW_CHECK -->|status == 'failed'| EXP_FAIL["🟢 Auto-Verified Non-Match<br/>(Authorized Gateway Failed Charge)"]:::fastpath
-        GW_CHECK -->|status == 'settled / pending'| ORPHAN["🔴 Ledger-Side Orphan Exception<br/>(Silent Capital Leakage Watchlist)"]:::quarantine
+        GW_CHECK -->|Gateway Status = 'failed'| AUTO_FAIL["🟢 Auto-Verified Expected Non-Match<br/>(Authorized Gateway Decline)"]:::fastpath
+        GW_CHECK -->|Gateway Status = 'settled / pending'| LEDGER_ORPHAN["🔴 Ledger-Side Orphan Exception<br/>(Silent Capital Leakage Watchlist)"]:::quarantine
     end
 
-    subgraph Plane4 ["PLANE 4: Downstream Operational Settlement & Self-Healing Bots"]
-        MATCHED -->|MDR / Tax / Timing Variance| FORENSIC["🔬 Discrepancy Decomposition Agent<br/>• 2% Contractual MDR Fee + 18% GST Split<br/>• T+1 / T+2 Clearing Float Isolation"]:::actions
-        
-        FORENSIC --> ERP_BOT["🤖 ERP Self-Healing Voucher Bot<br/>• Balanced Double-Entry Journal Creation<br/>• RFC-Compliant SAP S/4HANA & Tally JSON"]:::actions
-        
-        ORPHAN --> DISP_BOT["🤖 Bank Dispute Recovery Bot<br/>• Form-1 NPCI Recovery Notice Generation<br/>• Statutory Citation: PSS Act 2007 § 10(2)"]:::actions
+    subgraph S4 ["4. AUTONOMOUS OPERATIONAL ACTION BOTS"]
+        BOT1["⚡ ACTION BOT 1: ERP Self-Healing Voucher Bot<br/>• Synthesizes balanced double-entry vouchers<br/>• Ready-to-post SAP S/4HANA & Tally JSON<br/>• Strict Invariant: ∑ Debit ≡ ∑ Credit"]:::actionbot
+
+        BOT2["⚡ ACTION BOT 2: Bank Dispute Recovery Bot<br/>• Generates formal NPCI Form-1 Dispute Claims<br/>• Cites Section 10(2) of PSS Act 2007<br/>• Automated recovery of stranded nodal funds"]:::actionbot
+
+        AG4 -->|MDR / Tax / Timing Variance| BOT1
+        LEDGER_ORPHAN --> BOT2
     end
 
-    subgraph Plane5 ["PLANE 5: Regulatory Solvency & Cryptographic Merkle Attestation"]
-        MATCHED --> CRC["📊 Stanford Conformal Risk Calibration<br/>• Distribution-Free PAC Error Bound<br/>• Target Risk Budget α ≤ 0.001"]:::audit
-        QUAR --> CRC
-        ORPHAN --> CRC
+    subgraph S5 ["5. CRYPTOGRAPHIC MERKLE ATTESTATION & SOLVENCY PROOF"]
+        PAC["📊 Stanford Conformal Risk Calibration<br/>• Distribution-Free PAC Error Bound<br/>• Provable Risk Budget α ≤ 0.001"]:::crypto
         
-        CRC --> MERKLE["🔐 SHA-256 Merkle Audit Tree<br/>• Binary Hash Tree over All Traces<br/>• 64-Hex Cryptographic Root Attestation"]:::audit
+        MERKLE["🔐 SHA-256 Merkle Audit Tree<br/>• Binary Hash Tree over All Traces<br/>• 64-Hex Cryptographic Root Attestation"]:::crypto
         
-        MERKLE --> DOSSIER["🏛️ Statutory Audit Dossier Engine<br/>• RBI Master Directions (Section 25A)<br/>• Companies Act Form 3CB Tax Audit Pack"]:::audit
+        DOSSIER["🏛️ Statutory Audit Dossier Engine<br/>• RBI Master Directions (Section 25A)<br/>• Companies Act Form 3CB Tax Audit Pack"]:::crypto
+
+        RECON_OK --> PAC
+        QUAR_AMB --> PAC
+        LEDGER_ORPHAN --> PAC
+        
+        PAC --> MERKLE
+        MERKLE --> DOSSIER
     end
 ```
 
