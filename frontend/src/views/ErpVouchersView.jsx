@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api';
+import PageHeader from '../components/PageHeader';
 
 function AnimatedNumber({ value }) {
   const [displayValue, setDisplayValue] = useState(0);
@@ -57,6 +58,7 @@ export default function ErpVouchersView({ runId, onToast }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced'
+  const [isExportingXml, setIsExportingXml] = useState(false);
 
   useEffect(() => {
     loadVouchers();
@@ -88,6 +90,41 @@ export default function ErpVouchersView({ runId, onToast }) {
       onToast({ title: 'Tally XML Copied', message: `Voucher ${voucher.voucher_id} XML payload copied to clipboard.` });
     }
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleExportTallyXml = async () => {
+    setIsExportingXml(true);
+    try {
+      let blob;
+      if (vouchersData?.tally_batch_xml) {
+        blob = new Blob([vouchersData.tally_batch_xml], { type: 'application/xml;charset=utf-8' });
+      } else {
+        blob = await api.downloadTallyXml(runId);
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reconx_tally_vouchers_${runId}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (onToast) {
+        onToast({
+          title: 'Tally XML Exported',
+          message: `reconx_tally_vouchers_${runId}.xml downloaded successfully. Ready for Tally Prime import.`
+        });
+      }
+    } catch (e) {
+      console.error('Failed to export Tally XML:', e);
+      if (onToast) {
+        onToast({ type: 'error', title: 'Export Failed', message: e.message });
+      }
+    } finally {
+      setIsExportingXml(false);
+    }
   };
 
   const handleBatchSync = () => {
@@ -135,86 +172,86 @@ export default function ErpVouchersView({ runId, onToast }) {
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: '1440px', margin: '0 auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span className="badge badge-clean">
-              <FileSpreadsheet size={12} /> Autonomous Accounting Engine
-            </span>
-            <span className="badge badge-expected">
-              Double-Entry Invariant Guarded
-            </span>
-          </div>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', letterSpacing: '-0.4px', margin: 0 }}>
-            Automated ERP Journal Vouchers
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px', maxWidth: '750px', lineHeight: '1.4' }}>
-            Zero manual accounting reconciliation. Automatically generated double-entry journal vouchers ready for 1-click import into Tally Prime, SAP ECC/S4, Zoho Books, and Oracle NetSuite.
-          </p>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <motion.a
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            href={api.getTallyXmlUrl(runId)}
-            download={`tally_vouchers_${runId}.xml`}
-            className="btn btn-secondary"
-            style={{ padding: '8px 14px', fontSize: '12px', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none' }}
-          >
-            <Download size={13} />
-            <span>Export Tally XML</span>
-          </motion.a>
-
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleBatchSync}
-            disabled={syncStatus === 'syncing'}
-            className="btn btn-primary"
-            style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <AnimatePresence mode="wait">
-              {syncStatus === 'syncing' ? (
-                <motion.span
-                  key="syncing"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
+      <PageHeader
+        icon={FileSpreadsheet}
+        accentColor="#A78BFA"
+        badges={[
+          { label: 'Autonomous Accounting Engine', variant: 'clean' },
+          { label: 'Double-Entry Invariant Guarded', variant: 'expected' },
+        ]}
+        title="Automated ERP Journal Vouchers"
+        description="Zero manual accounting reconciliation. Automatically generated double-entry journal vouchers ready for 1-click import into Tally Prime, SAP ECC/S4, Zoho Books, and Oracle NetSuite."
+        rightSlot={
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleExportTallyXml}
+              disabled={isExportingXml}
+              className="btn btn-secondary"
+              style={{ padding: '8px 14px', fontSize: '12px', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+            >
+              {isExportingXml ? (
+                <>
                   <RefreshCw size={13} className="spin" />
-                  <span>Posting to ERP...</span>
-                </motion.span>
-              ) : syncStatus === 'synced' ? (
-                <motion.span
-                  key="synced"
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}
-                >
-                  <Check size={13} />
-                  <span>Synced with ERP</span>
-                </motion.span>
+                  <span>Exporting XML...</span>
+                </>
               ) : (
-                <motion.span
-                  key="idle"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                >
-                  <Send size={13} />
-                  <span>Batch Post to ERP</span>
-                </motion.span>
+                <>
+                  <Download size={13} />
+                  <span>Export Tally XML</span>
+                </>
               )}
-            </AnimatePresence>
-          </motion.button>
-        </div>
-      </div>
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleBatchSync}
+              disabled={syncStatus === 'syncing'}
+              className="btn btn-primary"
+              style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <AnimatePresence mode="wait">
+                {syncStatus === 'syncing' ? (
+                  <motion.span
+                    key="syncing"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <RefreshCw size={13} className="spin" />
+                    <span>Posting to ERP...</span>
+                  </motion.span>
+                ) : syncStatus === 'synced' ? (
+                  <motion.span
+                    key="synced"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}
+                  >
+                    <Check size={13} />
+                    <span>Synced with ERP</span>
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="idle"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Send size={13} />
+                    <span>Batch Post to ERP</span>
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          </div>
+        }
+      />
 
       {/* KPI Cards Grid with Staggered Entrance */}
       <motion.div
@@ -523,8 +560,8 @@ export default function ErpVouchersView({ runId, onToast }) {
                                   borderRadius: '3px',
                                   fontSize: '10px',
                                   fontWeight: '700',
-                                  background: entry.entry_type === 'DEBIT' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(96, 165, 250, 0.15)',
-                                  color: entry.entry_type === 'DEBIT' ? '#34D399' : '#60A5FA'
+                                  background: entry.entry_type === 'DEBIT' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(139, 92, 246, 0.15)',
+                                  color: entry.entry_type === 'DEBIT' ? '#34D399' : '#C084FC'
                                 }}
                               >
                                 {entry.entry_type === 'DEBIT' ? 'Dr' : 'Cr'}
@@ -536,7 +573,7 @@ export default function ErpVouchersView({ runId, onToast }) {
                             <td className="font-mono" style={{ padding: '7px 10px', textAlign: 'right', color: entry.debit_amount > 0 ? '#34D399' : 'var(--text-muted)' }}>
                               {entry.debit_amount > 0 ? `₹${entry.debit_amount.toFixed(2)}` : '-'}
                             </td>
-                            <td className="font-mono" style={{ padding: '7px 10px', textAlign: 'right', color: entry.credit_amount > 0 ? '#60A5FA' : 'var(--text-muted)' }}>
+                            <td className="font-mono" style={{ padding: '7px 10px', textAlign: 'right', color: entry.credit_amount > 0 ? '#C084FC' : 'var(--text-muted)' }}>
                               {entry.credit_amount > 0 ? `₹${entry.credit_amount.toFixed(2)}` : '-'}
                             </td>
                           </tr>
@@ -550,7 +587,7 @@ export default function ErpVouchersView({ runId, onToast }) {
                     <span style={{ color: 'var(--text-secondary)' }}>Invariant Balance Check</span>
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <span className="font-mono" style={{ color: '#34D399' }}>Dr: ₹{selectedVoucher.total_debit.toFixed(2)}</span>
-                      <span className="font-mono" style={{ color: '#60A5FA' }}>Cr: ₹{selectedVoucher.total_credit.toFixed(2)}</span>
+                      <span className="font-mono" style={{ color: '#C084FC' }}>Cr: ₹{selectedVoucher.total_credit.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

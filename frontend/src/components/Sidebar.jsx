@@ -55,7 +55,7 @@ export default function Sidebar({ currentView, setView, summary }) {
       id: "decisions",
       items: [
         { id: "analytics", label: "Executive Analytics", icon: BarChart3 },
-        { id: "scenarios", label: "Policy Scenarios", icon: GitCompare },
+        { id: "scenarios", label: "Policy & Sensitivity Studio", icon: Sliders },
         {
           id: "discrepancies",
           label: "Discrepancy Queue",
@@ -69,8 +69,7 @@ export default function Sidebar({ currentView, setView, summary }) {
           icon: AlertOctagon,
           count: exceptionCount > 0 ? exceptionCount : null,
           countType: "danger"
-        },
-        { id: "playground", label: "Threshold Playground", icon: Sliders }
+        }
       ]
     },
     {
@@ -275,7 +274,7 @@ export default function Sidebar({ currentView, setView, summary }) {
                                 borderRadius: '9px',
                                 cursor: 'pointer',
                                 position: 'relative',
-                                color: isActive ? '#C7D2FE' : 'var(--text-muted)',
+                                color: isActive ? '#DDD6FE' : 'var(--text-muted)',
                                 transition: 'color 0.15s ease'
                               }}
                             >
@@ -286,10 +285,10 @@ export default function Sidebar({ currentView, setView, summary }) {
                                   style={{
                                     position: 'absolute',
                                     inset: 0,
-                                    background: 'rgba(115, 120, 255, 0.18)',
-                                    border: '1px solid rgba(115, 120, 255, 0.38)',
+                                    background: 'rgba(139, 92, 246, 0.22)',
+                                    border: '1px solid rgba(139, 92, 246, 0.45)',
                                     borderRadius: '9px',
-                                    boxShadow: '0 0 12px rgba(115, 120, 255, 0.15)',
+                                    boxShadow: '0 0 12px rgba(139, 92, 246, 0.25)',
                                     zIndex: 0
                                   }}
                                 />

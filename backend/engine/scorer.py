@@ -1,7 +1,31 @@
+import math
 import re
 from datetime import datetime
 from typing import Dict, Any, Tuple
 from rapidfuzz import fuzz
+
+def clean_str(val: Any) -> str:
+    """Safely converts any value (including NaN, None, or float) to a clean string."""
+    if val is None:
+        return ""
+    if isinstance(val, float) and (math.isnan(val) or val != val):
+        return ""
+    s = str(val).strip()
+    return "" if s.lower() in ("nan", "none", "null") else s
+
+def clean_float(val: Any, default: float = 0.0) -> float:
+    """Safely converts any value to a float, defaulting to 0.0 for NaNs or invalid strings."""
+    if val is None:
+        return default
+    if isinstance(val, float):
+        return default if (math.isnan(val) or val != val) else val
+    try:
+        s = str(val).strip()
+        if not s or s.lower() in ("nan", "none", "null"):
+            return default
+        return float(s)
+    except (ValueError, TypeError):
+        return default
 
 class ScoringTool:
     """
@@ -27,17 +51,18 @@ class ScoringTool:
     SETTLEMENT_WINDOW_DAYS = 3
     
     @staticmethod
-    def normalize_text(text: str) -> str:
-        if not text:
+    def normalize_text(text: Any) -> str:
+        s = clean_str(text)
+        if not s:
             return ""
         # Remove special characters, extra spaces, uppercase
-        clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', str(text)).strip().upper()
+        clean = re.sub(r'[^a-zA-Z0-9\s]', ' ', s).strip().upper()
         return " ".join(clean.split())
 
     @classmethod
-    def calculate_utr_signal(cls, bank_utr: str, candidate_utr: str) -> Tuple[float, str]:
-        bank_utr_clean = (bank_utr or "").strip().upper()
-        cand_utr_clean = (candidate_utr or "").strip().upper()
+    def calculate_utr_signal(cls, bank_utr: Any, candidate_utr: Any) -> Tuple[float, str]:
+        bank_utr_clean = clean_str(bank_utr).upper()
+        cand_utr_clean = clean_str(candidate_utr).upper()
         
         if not bank_utr_clean or not cand_utr_clean:
             return 0.0, "Missing UTR on one or both sides"
@@ -48,11 +73,11 @@ class ScoringTool:
         return 0.0, f"UTR mismatch: {bank_utr_clean} vs {cand_utr_clean}"
 
     @classmethod
-    def calculate_ref_signal(cls, narration: str, bank_ref: str, invoice_ref: str, order_id: str) -> Tuple[float, str]:
-        narration_upper = (narration or "").upper()
-        bank_ref_upper = (bank_ref or "").upper()
-        inv_clean = (invoice_ref or "").strip().upper()
-        order_clean = (order_id or "").strip().upper()
+    def calculate_ref_signal(cls, narration: Any, bank_ref: Any, invoice_ref: Any, order_id: Any) -> Tuple[float, str]:
+        narration_upper = clean_str(narration).upper()
+        bank_ref_upper = clean_str(bank_ref).upper()
+        inv_clean = clean_str(invoice_ref).upper()
+        order_clean = clean_str(order_id).upper()
         
         if not inv_clean and not order_clean:
             return 0.0, "No invoice_ref or order_id available on ledger"
@@ -86,16 +111,18 @@ class ScoringTool:
         return 0.0, "No reference or order ID match"
 
     @classmethod
-    def calculate_name_signal(cls, bank_narration: str, extracted_name: str, ledger_name: str) -> Tuple[float, str]:
+    def calculate_name_signal(cls, bank_narration: Any, extracted_name: Any, ledger_name: Any) -> Tuple[float, str]:
         clean_ledger = cls.normalize_text(ledger_name)
         if not clean_ledger:
             return 0.0, "Missing counterparty name on ledger"
             
         candidates_to_test = []
-        if extracted_name:
-            candidates_to_test.append(cls.normalize_text(extracted_name))
-        if bank_narration:
-            candidates_to_test.append(cls.normalize_text(bank_narration))
+        c_extracted = cls.normalize_text(extracted_name)
+        if c_extracted:
+            candidates_to_test.append(c_extracted)
+        c_bank = cls.normalize_text(bank_narration)
+        if c_bank:
+            candidates_to_test.append(c_bank)
             
         if not candidates_to_test:
             return 0.0, "No name information in bank record"
@@ -112,32 +139,41 @@ class ScoringTool:
         return best_ratio, f"Name similarity: {best_ratio:.2f} ('{clean_ledger}')"
 
     @classmethod
-    def calculate_amount_signal(cls, bank_amount: float, gross_amount: float, fee: float, refund: float) -> Tuple[float, str]:
-        expected_net = round(gross_amount - fee - refund, 2)
-        diff_net = abs(round(bank_amount - expected_net, 2))
-        diff_gross = abs(round(bank_amount - gross_amount, 2))
+    def calculate_amount_signal(cls, bank_amount: Any, gross_amount: Any, fee: Any, refund: Any) -> Tuple[float, str]:
+        b_amt = clean_float(bank_amount, 0.0)
+        g_amt = clean_float(gross_amount, 0.0)
+        f_amt = clean_float(fee, 0.0)
+        r_amt = clean_float(refund, 0.0)
+
+        expected_net = round(g_amt - f_amt - r_amt, 2)
+        diff_net = abs(round(b_amt - expected_net, 2))
+        diff_gross = abs(round(b_amt - g_amt, 2))
         
         # Perfect net match (within ₹1 rounding tolerance)
         if diff_net <= cls.ROUNDING_TOLERANCE:
-            return 1.0, f"Exact net amount match (₹{bank_amount:.2f} == expected ₹{expected_net:.2f})"
+            return 1.0, f"Exact net amount match (₹{b_amt:.2f} == expected ₹{expected_net:.2f})"
             
         # Gross match without fee deducted at bank
         if diff_gross <= cls.ROUNDING_TOLERANCE:
-            return 0.85, f"Gross amount match (₹{bank_amount:.2f} == gross ₹{gross_amount:.2f}, fee not deducted at bank)"
+            return 0.85, f"Gross amount match (₹{b_amt:.2f} == gross ₹{g_amt:.2f}, fee not deducted at bank)"
             
         # Small discrepancy within standard fee range (up to 3.5% of gross or ₹50)
-        max_fee_allowance = max(50.0, gross_amount * 0.035)
+        max_fee_allowance = max(50.0, g_amt * 0.035)
         if diff_net <= max_fee_allowance:
             score = max(0.5, 1.0 - (diff_net / max_fee_allowance) * 0.5)
             return score, f"Amount close within fee margin (gap: ₹{diff_net:.2f})"
             
-        return 0.0, f"Significant amount mismatch: bank ₹{bank_amount:.2f} vs expected net ₹{expected_net:.2f}"
+        return 0.0, f"Significant amount mismatch: bank ₹{b_amt:.2f} vs expected net ₹{expected_net:.2f}"
 
     @classmethod
-    def calculate_date_signal(cls, bank_date_str: str, ledger_date_str: str) -> Tuple[float, str]:
+    def calculate_date_signal(cls, bank_date_str: Any, ledger_date_str: Any) -> Tuple[float, str]:
+        s_bank = clean_str(bank_date_str)
+        s_ledger = clean_str(ledger_date_str)
+        if not s_bank or not s_ledger:
+            return 0.0, "Missing date on bank or ledger record"
         try:
-            d_bank = datetime.strptime(bank_date_str.strip()[:10], "%Y-%m-%d")
-            d_ledger = datetime.strptime(ledger_date_str.strip()[:10], "%Y-%m-%d")
+            d_bank = datetime.strptime(s_bank[:10], "%Y-%m-%d")
+            d_ledger = datetime.strptime(s_ledger[:10], "%Y-%m-%d")
             days_diff = abs((d_bank - d_ledger).days)
             
             if days_diff == 0:
@@ -172,13 +208,13 @@ class ScoringTool:
         order_id = ledger_record.get("order_id", "")
         ledger_name = ledger_record.get("counterparty_name", "")
         
-        bank_amt = float(bank_record.get("amount", 0.0))
-        gross_amt = float(ledger_record.get("gross_amount", 0.0))
-        fee = float(ledger_record.get("razorpay_fee", 0.0))
-        refund = float(ledger_record.get("refund_amount", 0.0))
+        bank_amt = clean_float(bank_record.get("amount", 0.0))
+        gross_amt = clean_float(ledger_record.get("gross_amount", 0.0))
+        fee = clean_float(ledger_record.get("razorpay_fee", 0.0))
+        refund = clean_float(ledger_record.get("refund_amount", 0.0))
         
-        bank_date = str(bank_record.get("date", ""))
-        ledger_date = str(ledger_record.get("expected_settlement_date", ""))
+        bank_date = clean_str(bank_record.get("date", ""))
+        ledger_date = clean_str(ledger_record.get("expected_settlement_date", ""))
         
         # 1. Signals
         s_utr, utr_desc = cls.calculate_utr_signal(bank_utr, ledger_utr)

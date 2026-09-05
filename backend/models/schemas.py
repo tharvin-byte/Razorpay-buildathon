@@ -77,6 +77,11 @@ class AgentTraceStep(BaseModel):
     input_summary: str
     output_summary: str
     reasoning: Optional[str] = None
+    timestamp: Optional[str] = None
+    duration_ms: Optional[float] = None
+    tools_called: Optional[List[str]] = Field(default_factory=list)
+    step_hash: Optional[str] = None
+    status: Optional[str] = "COMPLETED"
 
 class ReconciliationResult(BaseModel):
     record_id: str # bank_txn_id or ledger_entry_id for reverse sweep
@@ -238,6 +243,7 @@ class DisputeClaim(BaseModel):
     merkle_proof_hash: str
     formal_letter_text: str
     created_at: str
+    counterparty_name: Optional[str] = None
 
 class DisputeListResponse(BaseModel):
     run_id: str

@@ -55,7 +55,7 @@ export default function Header({ runId, status, summary, onRunNewBatch, isRecomp
           >
             <Sliders size={11} color="var(--brand-indigo)" />
             <span>λ cutoff:</span>
-            <span className="font-mono" style={{ fontWeight: '700', color: '#818CF8' }}>
+            <span className="font-mono" style={{ fontWeight: '700', color: '#A78BFA' }}>
               {summary.current_threshold.toFixed(2)}
             </span>
           </div>

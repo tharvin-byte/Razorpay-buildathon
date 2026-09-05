@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Download, ShieldCheck, CheckCircle2, AlertTriangle, AlertOctagon, Printer } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { api } from '../api';
+import PageHeader from '../components/PageHeader';
 
 export default function ReportView({ runId }) {
   const [report, setReport] = useState(null);
@@ -37,32 +38,28 @@ export default function ReportView({ runId }) {
   return (
     <div style={{ padding: '28px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Top Header & Export Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className="badge badge-clean">
-              <ShieldCheck size={12} /> Statutory Compliance Dossier
-            </span>
+      <PageHeader
+        icon={ShieldCheck}
+        accentColor="#10B981"
+        badges={[
+          { label: 'Statutory Compliance Dossier', variant: 'clean' },
+          { label: `Run ${runId}`, variant: 'expected' },
+        ]}
+        title="Financial Controller Audit Report"
+        description={`Official audit-grade summary for Run ${runId} (Generated on ${report?.generated_at || '—'})`}
+        rightSlot={
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button className="btn-secondary" onClick={() => handleDownload('json')}>
+              <Download size={14} />
+              <span>Export JSON</span>
+            </button>
+            <button className="btn-primary" onClick={() => handleDownload('csv')}>
+              <Download size={14} />
+              <span>Export Audit CSV</span>
+            </button>
           </div>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', letterSpacing: '-0.4px', marginTop: '4px' }}>
-            Financial Controller Audit Report
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
-            Official audit-grade summary for Run <span className="font-mono" style={{ color: 'var(--brand-indigo)' }}>{runId}</span> (Generated on {report?.generated_at})
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn-secondary" onClick={() => handleDownload('json')}>
-            <Download size={14} />
-            <span>Export JSON</span>
-          </button>
-          <button className="btn-primary" onClick={() => handleDownload('csv')}>
-            <Download size={14} />
-            <span>Export Audit CSV</span>
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {/* In-Page Rendered Report Document */}
       <motion.div

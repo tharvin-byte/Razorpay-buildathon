@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+from xml.sax.saxutils import escape as xml_escape
 from backend.models.schemas import (
     ReconciliationResult, ERPVoucher, ERPAccountEntry, ERPVoucherResponse
 )
@@ -240,18 +241,22 @@ class ERPVoucherAgent:
         party: str,
         entries: List[ERPAccountEntry]
     ) -> str:
+        safe_id = xml_escape(str(vch_id))
+        safe_date = xml_escape(str(vch_date))
+        safe_narration = xml_escape(f"ReconX Automated Settlement Adjustment for {party}")
         lines = [
             f'  <VOUCHER VCHTYPE="Journal" ACTION="Create">',
-            f'    <VOUCHERNUMBER>{vch_id}</VOUCHERNUMBER>',
-            f'    <DATE>{vch_date}</DATE>',
-            f'    <NARRATION>ReconX Automated Settlement Adjustment for {party}</NARRATION>'
+            f'    <VOUCHERNUMBER>{safe_id}</VOUCHERNUMBER>',
+            f'    <DATE>{safe_date}</DATE>',
+            f'    <NARRATION>{safe_narration}</NARRATION>'
         ]
         for e in entries:
             is_dr = "Yes" if e.debit_amount > 0 else "No"
             amt_val = -e.debit_amount if e.debit_amount > 0 else e.credit_amount
+            safe_ledger = xml_escape(str(e.account_name))
             lines.extend([
                 f'    <ALLLEDGERENTRIES.LIST>',
-                f'      <LEDGERNAME>{e.account_name}</LEDGERNAME>',
+                f'      <LEDGERNAME>{safe_ledger}</LEDGERNAME>',
                 f'      <ISDEEMEDPOSITIVE>{is_dr}</ISDEEMEDPOSITIVE>',
                 f'      <AMOUNT>{amt_val:.2f}</AMOUNT>',
                 f'    </ALLLEDGERENTRIES.LIST>'

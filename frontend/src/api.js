@@ -127,6 +127,12 @@ export const api = {
     return `${API_BASE}/run/${runId}/erp-vouchers/tally-xml`;
   },
 
+  async downloadTallyXml(runId) {
+    const res = await fetch(`${API_BASE}/run/${runId}/erp-vouchers/tally-xml`);
+    if (!res.ok) throw new Error("Failed to download Tally XML");
+    return res.blob();
+  },
+
   async getDisputes(runId) {
     const res = await fetch(`${API_BASE}/run/${runId}/disputes`);
     if (!res.ok) throw new Error("Failed to fetch bank dispute claims");
@@ -137,6 +143,12 @@ export const api = {
     const res = await fetch(`${API_BASE}/run/${runId}/statutory-dossier`);
     if (!res.ok) throw new Error("Failed to fetch statutory audit dossier");
     return res.json();
+  },
+
+  async downloadStatutoryDossier(runId) {
+    const res = await fetch(`${API_BASE}/run/${runId}/statutory-dossier/download`);
+    if (!res.ok) throw new Error("Failed to download statutory audit dossier");
+    return res.blob();
   },
 
   getStatutoryDossierDownloadUrl(runId) {

@@ -10,6 +10,17 @@ from backend.engine.agents.decision_maker_agent import DecisionMakerAgent, Decis
 from backend.engine.audit_exporter import EvaluationHarness
 from backend.engine.conformal_verifier import MerkleAuditTree, ConformalRiskVerifier
 
+def _sanitize_df(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+    if df is None or not isinstance(df, pd.DataFrame):
+        return df
+    clean = df.copy()
+    for col in clean.columns:
+        if clean[col].dtype == object or pd.api.types.is_string_dtype(clean[col]):
+            clean[col] = clean[col].apply(lambda x: "" if (pd.isna(x) or str(x).strip().lower() in ("nan", "none", "null")) else str(x).strip())
+        elif pd.api.types.is_numeric_dtype(clean[col]):
+            clean[col] = clean[col].fillna(0.0)
+    return clean
+
 class ReconciliationOrchestrator:
     """
     Core Pipeline Orchestrator (Next-Gen Neuro-Symbolic):
@@ -26,9 +37,9 @@ class ReconciliationOrchestrator:
         confidence_threshold: float = ScoringTool.DEFAULT_CONFIDENCE_THRESHOLD,
         ground_truth: Optional[List[Dict[str, Any]]] = None
     ):
-        self.bank_df = bank_df.copy()
-        self.ledger_df = ledger_df.copy()
-        self.settlement_df = settlement_df.copy() if settlement_df is not None else None
+        self.bank_df = _sanitize_df(bank_df)
+        self.ledger_df = _sanitize_df(ledger_df)
+        self.settlement_df = _sanitize_df(settlement_df) if settlement_df is not None else None
         self.confidence_threshold = confidence_threshold
         self.ground_truth = ground_truth
         

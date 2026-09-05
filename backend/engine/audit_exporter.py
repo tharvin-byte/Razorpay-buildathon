@@ -131,24 +131,47 @@ class EvaluationHarness:
         ledger_df,
         settlement_df,
         ground_truth: List[Dict[str, Any]],
-        start: float = 0.60,
+        start: float = 0.55,
         end: float = 0.90,
-        step: float = 0.05
+        step: float = 0.05,
+        base_results: Optional[List[ReconciliationResult]] = None
     ) -> List[ThresholdSweepPoint]:
         from backend.engine.orchestrator import ReconciliationOrchestrator
         
-        points: List[ThresholdSweepPoint] = []
-        curr = start
-        while curr <= end + 1e-5:
-            thresh = round(curr, 2)
+        # 1. Obtain baseline results once
+        if base_results is None:
             orch = ReconciliationOrchestrator(
                 bank_df=bank_df,
                 ledger_df=ledger_df,
                 settlement_df=settlement_df,
-                confidence_threshold=thresh
+                confidence_threshold=start
             )
-            results = orch.run_pipeline()
-            metrics = cls.evaluate(results, ground_truth)
+            base_results = orch.run_pipeline()
+            
+        points: List[ThresholdSweepPoint] = []
+        curr = start
+        while curr <= end + 1e-5:
+            thresh = round(curr, 2)
+            
+            # Fast vectorized threshold filtering in memory (<1ms)
+            thresholded_results = []
+            for r in base_results:
+                score = r.confidence_score or 0.0
+                if r.status in ["matched_clean", "matched_with_discrepancy"]:
+                    if score < thresh:
+                        # Drop below threshold into exception
+                        r_copy = r.model_copy(update={
+                            "status": "exception",
+                            "exception_side": "bank",
+                            "exception_reason": f"Confidence score {score*100:.1f}% below sweep threshold {thresh*100:.1f}%."
+                        })
+                        thresholded_results.append(r_copy)
+                    else:
+                        thresholded_results.append(r)
+                else:
+                    thresholded_results.append(r)
+                    
+            metrics = cls.evaluate(thresholded_results, ground_truth)
             
             points.append(
                 ThresholdSweepPoint(

@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
 import TransactionInspectorDrawer from '../components/TransactionInspectorDrawer';
+import PageHeader from '../components/PageHeader';
 
 export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigateTab, onToast }) {
   const [transactions, setTransactions] = useState([]);
@@ -149,8 +150,8 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
           style={{
             height: '100%',
             width: '0%',
-            background: 'linear-gradient(90deg, #6366F1, #38BDF8, #34D399)',
-            boxShadow: '0 0 10px rgba(99, 102, 241, 0.7)',
+            background: 'linear-gradient(90deg, #8B5CF6, #C084FC, #34D399)',
+            boxShadow: '0 0 10px rgba(139, 92, 246, 0.7)',
             transition: 'width 0.08s ease-out'
           }}
         />
@@ -159,22 +160,16 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
       <div ref={containerRef} style={{ padding: '0 32px 32px 32px', maxWidth: '1440px', margin: '0 auto', position: 'relative' }}>
         {/* Header & Controls Toolbar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="badge badge-clean">
-                <CheckCircle2 size={12} /> Evidence Grid
-              </span>
-              <span className="badge badge-expected">
-                {filtered.length} of {transactions.length} Records
-              </span>
-            </div>
-            <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#fff', letterSpacing: '-0.3px', marginTop: '4px', margin: 0 }}>
-              Multi-Source Evidence Studio & Uncertainty Matrix
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px', maxWidth: '850px', lineHeight: '1.4' }}>
-              Real-time multi-ledger transaction matching stream with mathematical confidence decomposition and single-click dispute synthesis.
-            </p>
-          </div>
+          <PageHeader
+            icon={Layers}
+            accentColor="#8B5CF6"
+            badges={[
+              { label: 'Evidence Grid', variant: 'clean' },
+              { label: `${filtered.length} of ${transactions.length} Records`, variant: 'expected' },
+            ]}
+            title="Multi-Source Evidence Studio & Uncertainty Matrix"
+            description="Real-time multi-ledger transaction matching stream with mathematical confidence decomposition and single-click dispute synthesis."
+          />
 
           {/* View Toggle & Search */}
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -365,8 +360,8 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
                   style={{
                     cursor: 'pointer',
                     padding: '18px',
-                    background: isSelected ? 'var(--bg-elevated)' : undefined,
-                    borderColor: isSelected ? '#6366F1' : 'rgba(255, 255, 255, 0.04)',
+                    background: isSelected ? 'rgba(139, 92, 246, 0.08)' : undefined,
+                    borderColor: isSelected ? '#8B5CF6' : 'rgba(255, 255, 255, 0.04)',
                     boxShadow: isSelected ? '0 0 20px rgba(99, 102, 241, 0.25)' : undefined,
                     display: 'flex',
                     flexDirection: 'column',
@@ -404,9 +399,29 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
                       )}
                     </div>
 
-                    <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: '12px', minHeight: '32px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                      {t.explanation || t.exception_reason || narration || 'Reconciled successfully.'}
-                    </p>
+                    {/* Clean 2-Line Root Cause Card Preview */}
+                    <div
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.025)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderRadius: '8px',
+                        padding: '8px 10px',
+                        fontSize: '11px',
+                        color: '#CBD5E1',
+                        lineHeight: '1.45',
+                        marginBottom: '12px'
+                      }}
+                    >
+                      <div style={{ fontWeight: '700', color: isClean ? '#34D399' : isDisc ? '#FBBF24' : '#F87171', fontSize: '10.5px', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '2px' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: isClean ? '#34D399' : isDisc ? '#FBBF24' : '#F87171', flexShrink: 0 }} />
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {t.explanation?.split('\n\n')?.[0]?.replace(/^DIAGNOSIS:\s*|^WHAT IS.*:\s*|^•\s*/g, '') || (isClean ? 'Clean Parity Match' : isDisc ? 'Variance Identified' : 'Quarantined Exception')}
+                        </span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {t.explanation?.split('\n\n')?.[1]?.replace(/^ROOT CAUSE:\s*|^WHY.*:\s*|^•\s*/g, '') || t.exception_reason || narration || 'Reconciled and verified against accounting ledger.'}
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -427,7 +442,7 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
                           transition={{ duration: 0.6, ease: 'easeOut' }}
                           style={{
                             height: '100%',
-                            background: isClean ? 'linear-gradient(90deg, #6366F1, #10B981)' : isDisc ? 'linear-gradient(90deg, #6366F1, #F59E0B)' : 'linear-gradient(90deg, #6366F1, #F43F5E)'
+                            background: isClean ? 'linear-gradient(90deg, #8B5CF6, #10B981)' : isDisc ? 'linear-gradient(90deg, #8B5CF6, #F59E0B)' : 'linear-gradient(90deg, #8B5CF6, #F43F5E)'
                           }}
                         />
                       </div>
@@ -440,7 +455,7 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
                         {t.discrepancies?.length > 0 && <span className="tag-pill font-mono" style={{ fontSize: '10px', color: '#FBBF24' }}>{t.discrepancies[0].type}</span>}
                       </div>
 
-                      <span style={{ fontSize: '10.5px', color: '#818CF8', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{ fontSize: '10.5px', color: '#A78BFA', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                         Inspect <ChevronRight size={12} />
                       </span>
                     </div>
@@ -569,7 +584,7 @@ export default function TransactionsView({ runId, onSelectTxnForTrace, onNavigat
                 width: '42px',
                 height: '42px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366F1, #4F46E5)',
+                background: 'linear-gradient(135deg, #8B5CF6, #7C3AED)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
                 boxShadow: '0 8px 24px rgba(99, 102, 241, 0.4), 0 0 12px rgba(99, 102, 241, 0.2)',
                 color: '#fff',

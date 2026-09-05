@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
+import PageHeader from '../components/PageHeader';
 
 const DEFAULT_RULES = [
   {
@@ -135,31 +136,22 @@ export default function RulesEngineView({ runId, setView }) {
   return (
     <LayoutGroup id="rules-engine-group">
       <div style={{ padding: '24px 32px', maxWidth: '1440px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span className="badge badge-clean">
-                <Zap size={12} /> Autonomous Policy Engine
-              </span>
-              <span className="badge badge-expected">
-                Real-Time Simulation
-              </span>
-            </div>
-            <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#fff', letterSpacing: '-0.4px', margin: 0 }}>
-              Auto-Resolution Policy Engine
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px', maxWidth: '850px', lineHeight: '1.4' }}>
-              Deterministic financial policies automatically resolve known timing lags, fee variances, and rounding deltas before triggering human audits.
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          icon={Zap}
+          accentColor="#8B5CF6"
+          badges={[
+            { label: 'Autonomous Policy Engine', variant: 'clean' },
+            { label: 'Real-Time Simulation', variant: 'expected' },
+          ]}
+          title="Auto-Resolution Policy Engine"
+          description="Deterministic financial policies automatically resolve known timing lags, fee variances, and rounding deltas before triggering human audits."
+        />
 
         {/* 4-Column KPI Grid with Live Reactive Savings */}
         <div className="kpi-grid" style={{ marginBottom: '24px' }}>
           <div className="kpi-card">
             <div className="kpi-label">Active Policies</div>
-            <div className="kpi-value font-mono" style={{ color: '#60A5FA' }}>
+            <div className="kpi-value font-mono" style={{ color: '#A78BFA' }}>
               {activeRulesCount} of {rules.length} Active
             </div>
             <div className="kpi-subtext">Deterministic automation rules</div>
@@ -263,7 +255,7 @@ export default function RulesEngineView({ runId, setView }) {
                         width: '46px',
                         height: '24px',
                         borderRadius: '12px',
-                        background: rule.active ? '#4F46E5' : 'rgba(255, 255, 255, 0.1)',
+                        background: rule.active ? '#8B5CF6' : 'rgba(255, 255, 255, 0.1)',
                         border: 'none',
                         cursor: 'pointer',
                         padding: '2px',

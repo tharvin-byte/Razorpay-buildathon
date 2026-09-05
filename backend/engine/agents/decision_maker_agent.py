@@ -4,12 +4,44 @@ from backend.models.schemas import (
     ReconciliationResult, SignalBreakdown, DiscrepancyDetail,
     AgentTraceStep, BankRecord, LedgerRecord, SettlementRecord
 )
+from backend.engine.scorer import clean_str, clean_float
 from backend.engine.matcher import MatcherTool, BatchSettlementTool
 from backend.engine.agents.narration_parser_agent import NarrationParserAgent
 from backend.engine.agents.discrepancy_agent import DiscrepancyDecompositionAgent
 from backend.engine.vector_tensor import HybridTensorEngine, sinkhorn_bipartite_match
 from backend.engine.graph_solver import BipartiteGraphSolver
 from backend.engine.conformal_verifier import MerkleAuditTree
+
+def _clean_ledger_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+    c = dict(d)
+    c["ledger_entry_id"] = clean_str(c.get("ledger_entry_id", ""))
+    c["order_id"] = clean_str(c.get("order_id", ""))
+    c["merchant_id"] = clean_str(c.get("merchant_id", ""))
+    c["expected_settlement_date"] = clean_str(c.get("expected_settlement_date", ""))
+    c["gross_amount"] = clean_float(c.get("gross_amount", 0.0))
+    c["razorpay_fee"] = clean_float(c.get("razorpay_fee", 0.0))
+    c["refund_amount"] = clean_float(c.get("refund_amount", 0.0))
+    c["counterparty_name"] = clean_str(c.get("counterparty_name", ""))
+    c["invoice_ref"] = clean_str(c.get("invoice_ref", ""))
+    st = clean_str(c.get("status", "settled")).lower()
+    c["status"] = st if st in ("pending", "settled", "failed") else "settled"
+    if "utr_number" in c:
+        c["utr_number"] = clean_str(c.get("utr_number", "")) or None
+    return c
+
+def _clean_settle_dict(d: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not d:
+        return None
+    c = dict(d)
+    c["network_settlement_id"] = clean_str(c.get("network_settlement_id", ""))
+    c["settlement_batch_date"] = clean_str(c.get("settlement_batch_date", ""))
+    c["payment_method"] = clean_str(c.get("payment_method", "UPI")) or "UPI"
+    c["gross_amount"] = clean_float(c.get("gross_amount", 0.0))
+    c["network_fee"] = clean_float(c.get("network_fee", 0.0))
+    c["net_amount"] = clean_float(c.get("net_amount", 0.0))
+    c["merchant_order_ref"] = clean_str(c.get("merchant_order_ref", ""))
+    c["utr_number"] = clean_str(c.get("utr_number", "")) or None
+    return c
 
 class DecisionMakerAgent:
     """
@@ -29,10 +61,16 @@ class DecisionMakerAgent:
         self.graph_solver = BipartiteGraphSolver(tolerance=1.00)
 
     def process_bank_record(self, bank_record: Dict[str, Any]) -> ReconciliationResult:
-        bank_txn_id = bank_record.get("bank_txn_id", "")
-        bank_amt = float(bank_record.get("amount", 0.0) or 0.0)
-        bank_utr = str(bank_record.get("utr_number", "")).strip().upper()
-        narration = str(bank_record.get("narration", "")).strip()
+        bank_record = dict(bank_record)
+        bank_txn_id = clean_str(bank_record.get("bank_txn_id", ""))
+        bank_amt = clean_float(bank_record.get("amount", 0.0))
+        bank_utr = clean_str(bank_record.get("utr_number", "")).upper()
+        narration = clean_str(bank_record.get("narration", ""))
+        
+        bank_record["bank_txn_id"] = bank_txn_id
+        bank_record["amount"] = bank_amt
+        bank_record["utr_number"] = bank_utr or None
+        bank_record["narration"] = narration
         
         trace: List[AgentTraceStep] = []
         
@@ -50,6 +88,22 @@ class DecisionMakerAgent:
                     reasoning="Zero identifying signals available. Abstained from guessing."
                 )
             )
+            exp_text = (
+                f"DIAGNOSIS:\n"
+                f"Zero-Signal Inflow Anomaly (Unidentifiable Bank Credit ₹{bank_amt:,.2f})\n\n"
+                f"ROOT CAUSE:\n"
+                f"Bank record {bank_txn_id} was received with neither a UTR settlement reference nor any narration string. "
+                f"Lacks statutory metadata required to associate with an internal merchant order.\n\n"
+                f"FINANCIAL BREAKDOWN:\n"
+                f"Unidentified Bank Inflow : ₹{bank_amt:,.2f}\n"
+                f"Identified Ledger Amount : ₹0.00 [ZERO SIGNAL METADATA]\n"
+                f"Unallocated Variance Gap : ₹{bank_amt:,.2f}\n\n"
+                f"STATUS & ACTION:\n"
+                f"Resolution Status : Quarantined in Suspense Account (AML Compliance)\n"
+                f"Controller Action : Issue inquiry to acquiring bank clearing desk for remitter attribution.\n\n"
+                f"AUDIT PROOF:\n"
+                f"Bank transaction {bank_txn_id} quarantined under zero-guessing statutory policy."
+            )
             return ReconciliationResult(
                 record_id=bank_txn_id,
                 source_type="bank",
@@ -61,7 +115,7 @@ class DecisionMakerAgent:
                 discrepancies=[
                     DiscrepancyDetail(type="unreconciled_amount_gap", description="Zero identifying metadata in bank record", impact_amount=bank_amt)
                 ],
-                explanation="HONEST EXCEPTION: Bank record contains no UTR number or narration string. Insufficient signal to reconcile.",
+                explanation=exp_text,
                 exception_side="bank",
                 exception_reason="Zero metadata signals available for matching.",
                 trace=trace
@@ -126,8 +180,8 @@ class DecisionMakerAgent:
                             record_id=bank_txn_id,
                             source_type="bank",
                             bank_record=BankRecord(**bank_record),
-                            matched_ledger_record=LedgerRecord(**l_rec),
-                            matched_settlement_record=SettlementRecord(**settle_rec) if settle_rec else None,
+                            matched_ledger_record=LedgerRecord(**_clean_ledger_dict(l_rec)),
+                            matched_settlement_record=SettlementRecord(**_clean_settle_dict(settle_rec)) if settle_rec else None,
                             status=match_status,
                             confidence_score=score,
                             signals=SignalBreakdown(**signals_dict),
@@ -244,8 +298,8 @@ class DecisionMakerAgent:
                         record_id=bank_txn_id,
                         source_type="bank",
                         bank_record=BankRecord(**bank_record),
-                        matched_ledger_record=LedgerRecord(**l_rec),
-                        matched_settlement_record=SettlementRecord(**settle_rec) if settle_rec else None,
+                        matched_ledger_record=LedgerRecord(**_clean_ledger_dict(l_rec)),
+                        matched_settlement_record=SettlementRecord(**_clean_settle_dict(settle_rec)) if settle_rec else None,
                         status=match_status,
                         confidence_score=score,
                         signals=SignalBreakdown(**signals_dict),
@@ -264,11 +318,23 @@ class DecisionMakerAgent:
                         reasoning="Multiple competing candidates with near-identical confidence. Refused to guess."
                     )
                 )
+                cand_2 = candidates[1]["ledger_record"]
+                score_2 = candidates[1]["score"]
                 exc_reason = (
-                    f"HONEST EXCEPTION (Ambiguous Match): Competing ledger candidates "
-                    f"{l_rec['ledger_entry_id']} ({score*100:.1f}%) and "
-                    f"{candidates[1]['ledger_record']['ledger_entry_id']} ({candidates[1]['score']*100:.1f}%) "
-                    f"both fit the profile within < 8% delta. Flagged for finance review."
+                    f"DIAGNOSIS:\n"
+                    f"Ambiguous Competing Match Conflict (< 8% Score Differential)\n\n"
+                    f"ROOT CAUSE:\n"
+                    f"Multiple internal ERP ledger entries match bank deposit {bank_txn_id} (₹{bank_amt:,.2f}) with competing confidence: "
+                    f"{l_rec['ledger_entry_id']} ({score*100:.1f}%) vs {cand_2['ledger_entry_id']} ({score_2*100:.1f}%). Refused to guess under Zero-Guessing Policy.\n\n"
+                    f"FINANCIAL BREAKDOWN:\n"
+                    f"Bank Inflow Amount       : ₹{bank_amt:,.2f}\n"
+                    f"Candidate 1 Expected Net : ₹{float(l_rec.get('gross_amount', 0)) - float(l_rec.get('razorpay_fee', 0)):,.2f} ({l_rec.get('counterparty_name', 'Customer')})\n"
+                    f"Candidate 2 Expected Net : ₹{float(cand_2.get('gross_amount', 0)) - float(cand_2.get('razorpay_fee', 0)):,.2f} ({cand_2.get('counterparty_name', 'Customer')})\n\n"
+                    f"STATUS & ACTION:\n"
+                    f"Resolution Status : Quarantined under Zero-Guessing Policy\n"
+                    f"Controller Action : Human controller verification required before manual general ledger posting.\n\n"
+                    f"AUDIT PROOF:\n"
+                    f"Ambiguity delta {(score - score_2)*100:.1f}% below statutory confidence threshold."
                 )
                 return ReconciliationResult(
                     record_id=bank_txn_id,

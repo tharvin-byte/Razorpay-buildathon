@@ -41,3 +41,31 @@ Thumbs.db
 
 # Build & Logs
 *.log
+
+# Audio, Voiceovers & Video Recordings (Do not push heavy media)
+*.mp3
+*.wav
+*.m4a
+*.aac
+*.ogg
+*.mp4
+*.mkv
+*.mov
+*.webm
+*.avi
+part*_voiceover.mp3
+
+# Skills & Agent Tools Directory
+skills/
+.agents/
+
+# Internal Technical Design & Architecture Documentation
+ReconX_Technical_Design_Document.md
+*Technical_Design_Document*.md
+*technical_design*.md
+
+# Local Data Exports, Reports & Scratch Files
+audit_packs/
+exports/
+scratch/
+

@@ -21,13 +21,29 @@ import {
   Sliders
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api } from '../api';
 
 export default function AssistantChatView({ runId, onNavigateTab, onToast }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      text: `👋 **Hello! I am your ReconX AI Financial Controller & Treasury Copilot.**
+  const storageKey = `reconx_copilot_chat_${runId || 'default'}`;
+
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load chat history from sessionStorage', e);
+    }
+    return [
+      {
+        role: 'assistant',
+        text: `👋 **Hello! I am your ReconX AI Financial Controller & Treasury Copilot.**
 
 I am directly grounded in the live mathematical state of reconciliation run **\`${runId}\`**.
 
@@ -36,8 +52,18 @@ You can ask me to:
 - 📊 **Analyze variance & leakage** (e.g. *"What is our total MDR fee leakage?"*)
 - 🛠️ **Generate Tally XML vouchers** or **draft formal NPCI dispute notices**
 - 💡 Click any of the **Recommended Queries** on the left to start!`
+      }
+    ];
+  });
+
+  // Sync messages to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages));
+    } catch (e) {
+      console.warn('Failed to save chat to sessionStorage', e);
     }
-  ]);
+  }, [messages, storageKey]);
   const [inputQuery, setInputQuery] = useState('');
   const [sending, setSending] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState(null);
@@ -206,7 +232,7 @@ You can ask me to:
               }}
             >
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Reconciliation Rate</span>
-              <span className="font-mono" style={{ fontSize: '12.5px', fontWeight: '800', color: '#818CF8' }}>
+              <span className="font-mono" style={{ fontSize: '12.5px', fontWeight: '800', color: '#A78BFA' }}>
                 {summaryData ? `${(summaryData.match_rate * 100).toFixed(1)}%` : '70.7%'}
               </span>
             </div>
@@ -273,10 +299,9 @@ You can ask me to:
                   gap: '8px',
                   transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
-                onMouseOver={(e) => {
+                onMouseEnter={(e) => {
                   if (!sending) {
-                    e.currentTarget.style.background = 'rgba(99, 102, 241, 0.16)';
-                    e.currentTarget.style.borderColor = '#818CF8';
+                    e.currentTarget.style.borderColor = '#8B5CF6';
                     e.currentTarget.style.transform = 'translateY(-1px)';
                   }
                 }}
@@ -434,7 +459,7 @@ You can ask me to:
                       maxWidth: '85%',
                       background: isAssistant
                         ? 'linear-gradient(145deg, rgba(20, 29, 51, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%)'
-                        : 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)',
+                        : 'linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)',
                       border: isAssistant ? '1px solid rgba(115, 120, 255, 0.18)' : 'none',
                       borderRadius: isAssistant ? '4px 14px 14px 14px' : '14px 14px 4px 14px',
                       padding: '14px 18px',
@@ -444,14 +469,16 @@ You can ask me to:
                       boxShadow: isAssistant ? '0 4px 16px rgba(0, 0, 0, 0.25)' : '0 4px 16px rgba(79, 70, 229, 0.3)'
                     }}
                   >
-                    <div
-                      style={{
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        fontFamily: "var(--font-sans)"
-                      }}
-                    >
-                      {m.text}
+                    <div className="chat-markdown" style={{ wordBreak: 'break-word', overflowX: 'auto' }}>
+                      {isAssistant ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {m.text}
+                        </ReactMarkdown>
+                      ) : (
+                        <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {m.text}
+                        </div>
+                      )}
                     </div>
 
                     {isAssistant && (
@@ -542,25 +569,24 @@ You can ask me to:
                     background: 'rgba(20, 29, 51, 0.95)',
                     border: '1px solid rgba(115, 120, 255, 0.25)',
                     borderRadius: '4px 14px 14px 14px',
-                    padding: '10px 16px',
-                    fontSize: '12px',
-                    color: '#818CF8',
+                    color: '#A78BFA',
+                    fontSize: '11.5px',
+                    fontWeight: '700',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '10px'
+                    gap: '6px',
+                    marginBottom: '6px',
+                    padding: '10px 16px'
                   }}
                 >
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: '#818CF8',
-                      boxShadow: '0 0 8px #818CF8',
-                      animation: 'pulse 1.2s infinite'
-                    }}
-                  ></span>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#8B5CF6',
+                    boxShadow: '0 0 8px #8B5CF6',
+                    animation: 'pulse 1.5s infinite'
+                  }} />
                   <span>Synthesizing multi-agent treasury reasoning...</span>
                 </div>
               </motion.div>
@@ -595,9 +621,9 @@ You can ask me to:
               boxShadow: '0 6px 24px rgba(0, 0, 0, 0.35)',
               transition: 'all 0.15s ease'
             }}
-            onFocusCapture={(e) => {
-              e.currentTarget.style.borderColor = '#818CF8';
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(99, 102, 241, 0.25)';
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#8B5CF6';
+              e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.2)';
             }}
             onBlurCapture={(e) => {
               e.currentTarget.style.borderColor = 'rgba(115, 120, 255, 0.25)';
@@ -627,7 +653,7 @@ You can ask me to:
               type="submit"
               disabled={sending || !inputQuery.trim()}
               style={{
-                background: sending || !inputQuery.trim() ? 'rgba(99, 102, 241, 0.25)' : 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)',
+                background: sending || !inputQuery.trim() ? 'rgba(139, 92, 246, 0.25)' : 'linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '8px',
@@ -659,7 +685,7 @@ You can ask me to:
               color: 'var(--text-muted)'
             }}
           >
-            <Shield size={11} color="#818CF8" />
+            <Shield size={11} color="#A78BFA" />
             <span>ReconX Copilot is mathematically grounded in run state • Conformal Risk α ≤ 0.001 Certified</span>
           </div>
         </div>
