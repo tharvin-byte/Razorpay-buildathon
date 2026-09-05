@@ -1,4 +1,4 @@
-like i# ReconX — Autonomous Financial Reconciliation & Treasury Solvency Engine
+# ReconX — Autonomous Financial Reconciliation & Treasury Solvency Engine
 
 [![ReconX YouTube Video Demo](https://img.shields.io/badge/▶_Watch_Full_Demo_on_YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K)
 > **Direct Video Link:** [https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K](https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K)
