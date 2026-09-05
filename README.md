@@ -1,13 +1,6 @@
 # ReconX — Autonomous Multi-Agent Financial Reconciliation Engine
 ### *Next-Generation Neuro-Symbolic Treasury Controller & Escrow Solvency Attestation*
 
-[![Track](https://img.shields.io/badge/Razorpay_Buildathon_2026-Track_04:_AI_Finance_Controller-0C2340?style=for-the-badge&logo=razorpay&logoColor=3395FF)](https://razorpay.com)
-[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI_0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/Frontend-React_18_%7C_Vite_6-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![Compliance](https://img.shields.io/badge/Compliance-DPDP_Act_2023_%7C_RBI_Data_Localization-4CAF50?style=for-the-badge)](https://rbi.org.in)
-[![Cryptography](https://img.shields.io/badge/Auditing-SHA--256_Merkle_Tree_Proof-8B5CF6?style=for-the-badge)](https://en.wikipedia.org/wiki/Merkle_tree)
-
 ---
 
 ## 📺 Project Video Walkthrough & Live Demonstration
