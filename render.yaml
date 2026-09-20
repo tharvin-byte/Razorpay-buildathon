@@ -1,0 +1,115 @@
+# render.yaml — Render Blueprint for ReconX
+#
+# WHY THIS FILE EXISTS:
+# Previously, ReconX had NO deployment configuration. It could only run manually
+# on a developer's local machine using two separate terminal commands.
+#
+# This file is a "Blueprint" that Render.com reads to automatically:
+#   1. Create, build, and deploy the FastAPI backend as a Python Web Service.
+#   2. Create, build, and deploy the React/Vite frontend as a Static Site.
+#   3. Wire them together automatically using an environment variable.
+#
+# All you do is: dashboard.render.com → New → Blueprint → select this repo → Apply.
+# Render handles everything else — SSL certificates, build pipeline, CDN, live URLs.
+#
+# HOW IT WAS BEFORE:
+#   - Backend: run manually with: python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+#   - Frontend: run manually with: cd frontend && npm run dev
+#   - Only accessible on your local machine (127.0.0.1). Nobody else could access it.
+#
+# HOW IT IS NOW (with this file):
+#   - Backend: https://reconx-backend.onrender.com  (auto-built, always live, free HTTPS)
+#   - Frontend: https://reconx-frontend.onrender.com  (global CDN, always live, free HTTPS)
+#   - Anyone in the world can access your live app via a public URL.
+
+services:
+  # ─────────────────────────────────────────────
+  # SERVICE 1: FastAPI Backend (Python Web Service)
+  # ─────────────────────────────────────────────
+  - type: web
+    name: reconx-backend
+    runtime: python
+    region: singapore   # Closest to India for lowest latency
+    plan: free
+
+    # WHY THIS BUILD COMMAND:
+    # BEFORE: You manually ran "pip install -r requirements.txt" in your terminal once.
+    # NOW: Render runs this automatically every time you push code to GitHub.
+    buildCommand: pip install -r requirements.txt
+
+    # WHY THIS START COMMAND:
+    # BEFORE: You ran "python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload"
+    # CHANGE 1: --host changed from 127.0.0.1 to 0.0.0.0
+    #   → 127.0.0.1 means "only accept connections from this same machine".
+    #     On a cloud server, your browser is NOT on the same machine, so 127.0.0.1 would
+    #     refuse all incoming traffic. 0.0.0.0 means "accept connections from any IP".
+    # CHANGE 2: --port changed from 8000 to $PORT
+    #   → Render dynamically assigns a port to each service. $PORT is the environment
+    #     variable Render provides. We must use it instead of a hardcoded 8000.
+    # CHANGE 3: --reload removed
+    #   → --reload is a development-only flag that restarts the server on every file save.
+    #     In production, files never change, so --reload wastes CPU and slows startup.
+    startCommand: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+
+    # CORS: The backend's CORS is already set to allow_origins=["*"] in main.py,
+    # so no extra headers are needed here.
+
+    envVars:
+      # If the user has a Gemini API key, they can add it in Render dashboard.
+      # It is optional — ReconX runs 100% without it (falls back to rule-based engine).
+      - key: GEMINI_API_KEY
+        sync: false  # means: user fills this in manually in Render dashboard (keeps it secret)
+
+  # ─────────────────────────────────────────────
+  # SERVICE 2: React/Vite Frontend (Static Site)
+  # ─────────────────────────────────────────────
+  - type: web
+    name: reconx-frontend
+    runtime: static
+    region: singapore
+    plan: free
+
+    # WHY rootDir:
+    # BEFORE: You ran "cd frontend && npm run dev" — you were already inside the frontend folder.
+    # NOW: Render starts from the repo root. We tell it to look inside the "frontend" subfolder.
+    rootDir: frontend
+
+    # WHY THIS BUILD COMMAND:
+    # BEFORE: "npm run dev" — this starts a local development server, NOT a production build.
+    #   A dev server cannot be deployed; it is slow, unoptimized, and not a real website.
+    # NOW: "npm install && npm run build" — this creates an optimized production bundle
+    #   in "frontend/dist/". This is a folder of plain HTML, CSS, and JS files that any
+    #   web server can serve instantly with zero Node.js needed.
+    buildCommand: npm install && npm run build
+
+    # WHY publishDir: dist
+    # "npm run build" puts all the output files into the "dist" folder.
+    # We tell Render: "serve the files from this folder as the website".
+    staticPublishPath: dist
+
+    # WHY routes / rewrite rule:
+    # BEFORE: Locally, Vite dev server automatically handled browser routing (e.g. /analytics,
+    #   /nodal-flow). Visiting any URL refreshed correctly.
+    # NOW with a static site: When a user refreshes on /analytics, Render looks for a file
+    #   called "analytics/index.html" which does NOT exist (React is a Single Page App —
+    #   there's only one index.html at the root). Without this rule, every page refresh
+    #   except the homepage would show a "404 Not Found" error.
+    # This rewrite rule tells Render: "For any URL that isn't an existing file, serve
+    #   index.html instead" — which lets React Router handle the navigation client-side.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    envVars:
+      # WHY VITE_API_BASE:
+      # BEFORE: api.js had this hardcoded: const API_BASE = "http://127.0.0.1:8000"
+      # This worked locally but would break in production because 127.0.0.1 is your
+      # laptop — not the Render server. We changed api.js to read from this env variable.
+      # NOW: During "npm run build" on Render, Vite bakes this URL into the output JS bundle.
+      # Every fetch() call in the app will go to the live Render backend instead of localhost.
+      #
+      # IMPORTANT: After deploying the backend, copy its URL from the Render dashboard
+      # and paste it here (replacing the placeholder below), then redeploy the frontend.
+      - key: VITE_API_BASE
+        value: https://reconx-backend.onrender.com

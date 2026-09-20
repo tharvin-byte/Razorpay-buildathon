@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pandas
+numpy
+rapidfuzz
+pydantic
+pytest
+python-dotenv
+google-genai
+python-multipart

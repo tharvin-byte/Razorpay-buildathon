@@ -1,4 +1,15 @@
-const API_BASE = "http://127.0.0.1:8000";
+// BEFORE:  const API_BASE = "http://127.0.0.1:8000";
+// WHY CHANGED: The old line was hardcoded to your local machine's address.
+// When this frontend is deployed on Render (or any cloud), it would still try to
+// call "127.0.0.1" — which is the user's own browser/laptop, not the server.
+// This would break 100% of API calls in production.
+//
+// NOW: We read from a Vite environment variable (VITE_API_BASE).
+// - Locally (npm run dev): .env.development sets it to http://127.0.0.1:8000 → same as before.
+// - On Render (production build): Render injects VITE_API_BASE=https://your-backend.onrender.com
+// If the env var is missing for any reason, it falls back to "" (empty string),
+// which means the frontend and backend are served from the same origin — perfect for Docker.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
 export const api = {
   async getStatus(runId) {
