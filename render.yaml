@@ -112,4 +112,4 @@ services:
       # IMPORTANT: After deploying the backend, copy its URL from the Render dashboard
       # and paste it here (replacing the placeholder below), then redeploy the frontend.
       - key: VITE_API_BASE
-        value: https://reconx-backend.onrender.com
+        value: https://razorpay-buildathon-6zzj.onrender.com
