@@ -1,15 +1,59 @@
-# ReconX — Autonomous Financial Reconciliation & Treasury Solvency Engine
+# ReconX — Multi-Source Financial Reconciliation Intelligence
 
-[![ReconX YouTube Video Demo](https://img.shields.io/badge/▶_Watch_Full_Demo_on_YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K)
-> **Direct Video Link:** [https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K](https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K)
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-4CAF50?style=for-the-badge)](https://razorpay-buildathon-frontend-3z5m.onrender.com)
+[![API Docs](https://img.shields.io/badge/📖_API_Docs-0288D1?style=for-the-badge)](https://razorpay-buildathon-6zzj.onrender.com/docs)
+[![Watch Demo](https://img.shields.io/badge/▶_YouTube_Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtu.be/lrncP_iNwpM?si=mMvm-FgduKV0cY1K)
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-ReconX reconciles multi-source financial inflows (Nodal Bank Statements, ERP General Ledgers, and Payment Gateway Settlement feeds) at scale. A deterministic multi-tier matching engine — using an $\mathcal{O}(1)$ inverted hash index fast-path, 5-channel orthogonal scoring, and combinatorial batch netting — resolves clean matches and isolates discrepancies (MDR fees, 18% statutory GST splits, timing lags). For unresolvable or ambiguous candidate pairs ($\Delta < 0.08$), the engine **strictly abstains from probabilistic guessing** and quarantines transactions into an AML suspense registry. Autonomous action bots synthesize balanced double-entry ERP vouchers (Tally XML / Zoho JSON) and statutory NPCI Form-1 dispute recovery letters (PSS Act 2007 §10), while every finalized decision is sealed in an immutable SHA-256 Merkle audit tree.
+> **Built for Track 04: AI Finance Controller — Razorpay Buildathon 2026**
 
-This is an end-to-end **Phase 1 vertical slice**: every layer in the target architecture is implemented end-to-end with production-shaped interfaces, using high-performance local in-memory run stores and offline mathematical benchmark suites (`backend/tests/test_tensor_engine.py`), running immediately with zero external cloud dependencies or paid API keys.
+ReconX is an autonomous, multi-agent financial reconciliation platform that matches and explains discrepancies across three enterprise data sources: **Nodal Bank Statements**, **Internal ERP Ledgers**, and **Payment Gateway Settlement feeds**. It is designed to operate without external LLM APIs, using a deterministic rule-based engine grounded in published mathematical research — making it suitable for regulated Indian financial environments.
 
 ---
 
-## Live Pipeline Architecture
+## 🌐 Live Deployment
+
+| Service | URL |
+|:---|:---|
+| **Frontend Dashboard** | https://razorpay-buildathon-frontend-3z5m.onrender.com |
+| **Backend REST API** | https://razorpay-buildathon-6zzj.onrender.com |
+| **Interactive API Docs** | https://razorpay-buildathon-6zzj.onrender.com/docs |
+
+> **Note:** The free-tier backend may take 30–50 seconds to wake up on first request after a period of inactivity. This is a Render free-tier characteristic, not an application issue.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Benchmark Metrics](#benchmark-metrics)
+- [Quick Start (Local)](#quick-start-local)
+- [Project Structure](#project-structure)
+- [API Reference](#api-reference)
+- [Design Decisions](#design-decisions)
+- [Roadmap](#roadmap)
+- [Engineering Notes](#engineering-notes)
+
+---
+
+## Overview
+
+Indian enterprises reconciling high-volume payment flows face three compounding challenges:
+
+1. **Regulatory constraints:** RBI Nodal Escrow directives and the DPDP Act 2023 restrict sending raw transaction PII to external cloud AI APIs.
+2. **Data complexity:** Indian bank narrations are noisy, truncated, and inconsistently formatted across institutions, making rule-free matching unreliable.
+3. **Scale:** At NPCI-level volumes (billions of monthly UPI transactions), probabilistic AI inference latency and per-token API costs are operationally unviable.
+
+ReconX addresses these constraints by implementing a **deterministic, neuro-symbolic 4-agent pipeline** that runs fully on-premise, with no external model dependencies.
+
+---
+
+## Architecture
 
 ```text
 ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────────┐
@@ -17,222 +61,270 @@ This is an end-to-end **Phase 1 vertical slice**: every layer in the target arch
 └────────┬────────┘       └────────┬────────┘       └──────────┬──────────┘
          └─────────────────┬───────┴───────────────────────────┘
                            │
-                 [ Inverted Index O(1) ]
-                 Fast-path UTR & Invoice Hash Lookup
+                 [ Planner Agent ]
+                 Inverted Index O(1) — UTR & Invoice Hash Lookup
                            │
              ┌─────────────┴─────────────┐
              ▼                           ▼
      [ Exact Match ]            [ Fuzzy / Discrepancy ]
-     Score = 1.0                NarrationParserAgent (Subword Tokens)
-             │                  5-Channel Orthogonal ScoringTool:
-             │                  • Exact UTR Hash (0.45)
-             │                  • Invoice / Order Ref (0.25)
-             │                  • Counterparty RapidFuzz (0.15)
-             │                  • Amount & MDR Kernel (0.10)
-             │                  • Date Proximity Window (0.05)
-             │                           │
+     Score = 1.0                NarrationParserAgent
+                                (Regex + Subword Tokenizer)
+                                5-Channel Orthogonal Scoring:
+                                • Exact UTR Hash        (w=0.45)
+                                • Invoice / Order Ref   (w=0.25)
+                                • Counterparty Fuzzy    (w=0.15)
+                                • Amount & MDR Kernel   (w=0.10)
+                                • Date Proximity Decay  (w=0.05)
+                                         │
              └─────────────┬─────────────┘
                            │
-           [ DecisionMakerAgent (1:1 Mutex) ]
-           Conflict Detector & Zero-Guessing Filter (< 8% Δ)
+           [ DecisionMaker Agent ]
+           Conflict Detector & Abstention Filter (Δ < 0.08)
                            │
              ┌─────────────┴─────────────┐
              ▼                           ▼
     [ Matched / Discrepancy ]       [ Quarantined Exception ]
-    DiscrepancyDecompositionAgent   AML Suspense Registry
-    (2% MDR Fee & 18% GST Split)    (Controller Verification Required)
-             │                                   │
-             ▼                                   ▼
+    DiscrepancyAgent                AML Suspense Registry
+    (MDR Fee & 18% GST Split)       (Manual Controller Review)
+             │                                  │
+             ▼                                  ▼
     [ ERPVoucherAgent ]             [ BankDisputeAgent ]
-    Tally XML / Zoho JSON           NPCI Form-1 Letter (PSS Act 2007)
-             │                                   │
-             └─────────────┬─────────────────────┘
+    Tally XML / Zoho JSON           NPCI Form-1 (PSS Act 2007 §10)
+             │                                  │
+             └─────────────┬────────────────────┘
                            │
             [ SHA-256 Merkle Audit Tree ]
-            Immutable Attestation Root (64-hex)
+            Tamper-Evident Attestation Root (64-hex)
 ```
+
+### The 4 Agents
+
+| Agent | Role |
+|:---|:---|
+| **Planner Agent** | Ingests and normalizes multi-format CSVs; builds `O(1)` inverted index trees across UTRs, Order IDs, and timestamps |
+| **Narration Parser Agent** | Extracts structured tokens (UPI handles, IMPS codes, POS IDs, MDR tags) from unstructured Indian bank narration strings |
+| **Matcher / DecisionMaker Agent** | Runs 5-channel orthogonal scoring; resolves 1:1 matches, N:1 batch netting, and routes low-confidence pairs to quarantine |
+| **Discrepancy & Audit Agent** | Decomposes fee variances (MDR 2%, GST 18%), generates Big-4-style audit memos, and seals all decisions into the Merkle tree |
 
 ---
 
-## Quick start
+## Features
 
-Requires Python 3.10+ and Node.js 18+.
+### Core Reconciliation
+- **Flexible Multi-Source Ingestion:** Operates on any 2 out of 3 sources (bilateral) or full 3-way triangulation — no rigid file requirements
+- **O(1) Fast-Path Matching:** Inverted hash index for clean UTR/invoice lookups before falling back to fuzzy scoring
+- **5-Channel Orthogonal Scoring:** Weighted signal combination across reference IDs, narrations, amounts, and timestamps
+- **Abstention on Ambiguity:** Records with a confidence gap < 8% between top-2 candidates are quarantined rather than force-matched
+- **Conformal Risk Profiling:** When synthetic ground truth is available, computes distribution-free confidence bounds (Angelopoulos et al., Stanford CRC)
+
+### Enterprise Outputs
+- **ERP Journal Vouchers:** Auto-generated balanced double-entry Debit/Credit vouchers exported as Tally XML and Zoho JSON
+- **Bank Dispute Claims:** Statutory NPCI Form-1 recovery letters with embedded UTR evidence (PSS Act 2007 §10)
+- **Nodal Escrow Flow:** 4-stage RBI-compliant flow visualization with MDR fee splits, 18% GST deductions, and T+0/T+1/T+2 liquidity aging
+- **SHA-256 Merkle Audit Tree:** Cryptographic tamper-evident attestation of all reconciliation decisions
+- **Statutory Audit Dossier:** Structured RBI Master Direction §25A export for external auditors
+
+### Intelligence & Operations
+- **15-View Enterprise Dashboard:** Built in React 19 + Vite with Framer Motion animations
+- **Natural Language Financial Copilot:** Optional Gemini-powered query assistant grounded in run data (falls back to rule-based if no API key)
+- **Threshold Playground:** Interactive confidence threshold adjustment with live precision/recall sweep
+- **Agent Trace Explorer:** Step-by-step reasoning trace for every individual transaction decision
+- **6 Pre-built Simulation Scenarios:** Mass refund storm, RTGS timing lag, MDR overcharge, and more
+
+---
+
+## Benchmark Metrics
+
+> Tested on a standard developer machine (Intel Core i7 / 16 GB RAM) using the bundled synthetic seed (`seed=42`, 70 bank records × 100 ledger entries × settlement feed).
+
+| Metric | Observed Value | Notes |
+|:---|:---|:---|
+| **Match Rate** | ~85–92% | Varies with narration quality and UTR availability |
+| **Throughput** | ~2.1 s per 1,000-record batch | Single-threaded, in-memory, no database I/O |
+| **MDR & GST Decomposition** | High precision on contractual fee structures | Based on fixed 2% MDR + 18% GST rules |
+| **Abstention Rate** | ~5–12% of records quarantined | Records where Δ score < 0.08 between top-2 candidates |
+| **Conformal Error Bound (α)** | ≤ 0.001 target | Requires ground-truth labels; not applicable on unlabelled real-world data |
+| **Merkle Root Generation** | < 5 ms per run | SHA-256 over all finalized match pairs |
+
+> **Important:** All metrics above are measured on **synthetic, labelled benchmark data** generated by `data_generator.py`. Performance on real-world production data will vary based on data quality, narration consistency, UTR availability, and institutional formatting differences. The system is a research prototype and should be validated against production data before operational deployment.
+
+---
+
+## Quick Start (Local)
+
+Requires **Python 3.10+** and **Node.js 18+**.
+
+### Option A: One-Click Launch
 
 ```bash
-# Clone the repository
-git clone https://github.com/tharvin-byte/Razorpay-buildathon.git reconx && cd reconx
-
-# Option A: One-Click Unified Launch (Recommended)
+git clone https://github.com/tharvin-byte/Razorpay-buildathon.git reconx
+cd reconx
+pip install -r requirements.txt
 python run_reconx.py
 ```
 
-Or start the services in separate terminals:
+### Option B: Separate Terminals
 
 ```bash
-# Terminal 1: FastAPI Backend + Deterministic Matching Engine
-pip install -r requirements.txt # or: pip install fastapi uvicorn pandas numpy rapidfuzz pydantic pytest
+# Terminal 1 — FastAPI Backend
+pip install -r requirements.txt
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ```bash
-# Terminal 2: Enterprise Treasury Console (React 18 + Vite 6)
+# Terminal 2 — React Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
-Open **http://localhost:5173/** for the ReconX Intelligence Dashboard, or **http://127.0.0.1:8000/docs** for the interactive Swagger API documentation.
+- **Dashboard:** http://localhost:5173
+- **API Docs:** http://127.0.0.1:8000/docs
 
-### Demo Run & Ground-Truth Verification
-The platform automatically bootstraps a verified multi-source demo batch on startup (`demo-run-001`):
-- **Bank Records:** 70 transactions across UPI, IMPS, NEFT, RTGS
-- **Internal Ledger:** 100 merchant order captures
-- **Settlement Feed:** Aggregator batch fee & tax deductions
-- **Independent Ground Truth:** Embedded synthetic labels to evaluate precision, recall, and conformal error bounds.
+### Optional: Gemini Copilot
 
-In a third terminal (optional test check):
 ```bash
-python -m pytest backend/tests/test_api.py -v
+# In .env file — copy from .env.example
+GEMINI_API_KEY=your_key_here
 ```
 
-Everything above runs **100% offline** with zero external API keys.
+The natural language Financial Copilot uses `gemini-2.5-flash` when a key is provided. Without a key, it falls back to a deterministic rule-based assistant automatically.
 
-### Using Gemini for Natural Language Copilot (Optional)
-```bash
-# In your .env file:
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-When configured, the interactive Financial Copilot drawer (`/chat`) uses Google's `gemini-2.5-flash` to answer natural language treasury queries grounded in the reconciled run data. If no key is set, the Copilot gracefully falls back to a deterministic rule-based assistant.
-
----
-
-## Verifying it works
+### Running Tests
 
 ```bash
-# Execute all 22 automated tests across matching, decomposition, ERP vouchers, disputes, and tensor benchmarks:
+# Run all 22 automated test suites
 python -m pytest backend/tests/ -v
 ```
 
-### Reference Benchmark Metrics (Bundled Seed = 42)
-*Tested on standard developer hardware (Intel Core i7 / 16GB RAM):*
-- **Match Rate:** ~85–92% across heterogeneous dirty narrations and timing lags.
-- **Throughput:** ~2.1 seconds per 1,000-record multi-source batch.
-- **MDR & GST Separation Accuracy:** 100% mathematical precision on contractual fee decompositions.
-- **Conservation of Money:** Zero balance leakage ($|\sum \text{Bank} - \sum \text{Ledger}| \le ₹1.00$).
-- **Zero-Guessing Invariant:** 100% abstention on ambiguous pairs ($\Delta < 0.08$ score delta).
+The platform bootstraps a demo run (`demo-run-001`) automatically on startup with 70 bank records, 100 ledger entries, and embedded ground truth for immediate testing.
 
 ---
 
-## Project layout
+## Project Structure
 
 ```text
-backend/
-├── main.py                          FastAPI application, in-memory run store, and API routes
-├── models/
-│   └── schemas.py                   Pydantic v2 schemas for multi-source inputs, results, and KPIs
-├── engine/
-│   ├── orchestrator.py              Reconciliation orchestrator, Merkle tree sealing, conformal profiler
-│   ├── matcher.py                   O(1) Inverted Index, Reverse-Sweep tool, and BatchSettlementTool
-│   ├── scorer.py                    5-channel orthogonal scoring tool (Levenshtein, amount, date decay)
-│   ├── data_generator.py            Synthetic multi-source financial generator with hidden ground truth
-│   ├── audit_exporter.py            SHA-256 Merkle tree exporter, EvaluationHarness, RBI Form 3CB
-│   ├── vector_tensor.py             R&D: 3D Multi-Signal Tensor Core & Sinkhorn Optimal Transport
-│   ├── graph_solver.py              R&D: Bipartite Graph Partitioning & Lifecycle DAG Netting
-│   └── agents/
-│       ├── decision_maker_agent.py  Autonomous decision-maker agent with 1-to-1 linear claim mutex
-│       ├── narration_parser_agent.py Regex and semantic subword extraction for truncated bank narrations
-│       ├── discrepancy_agent.py     Forensic MDR fee (2%) and 18% statutory GST decomposition
-│       ├── erp_voucher_agent.py     Self-healing double-entry journal vouchers (Tally XML / Zoho JSON)
-│       ├── bank_dispute_agent.py    Statutory dispute claim letters (PSS Act 2007 §10(2) / NPCI Form-1)
-│       └── assistant_agent.py       RAG-grounded Financial Copilot (Gemini 2.5 Flash with rule fallback)
-frontend/                            React 18 + Vite 6 treasury console (15 dedicated views)
-backend/tests/                       22 automated test suites verifying correctness and invariants
-run_reconx.py                        One-click dual-server launcher
+reconx/
+├── backend/
+│   ├── main.py                          FastAPI app, in-memory run store, API routes
+│   ├── models/
+│   │   └── schemas.py                   Pydantic v2 schemas for all inputs and outputs
+│   └── engine/
+│       ├── orchestrator.py              Multi-phase pipeline orchestrator
+│       ├── matcher.py                   O(1) inverted index, reverse sweep, batch settlement
+│       ├── scorer.py                    5-channel orthogonal scoring engine
+│       ├── data_generator.py            Synthetic multi-source data generator with ground truth
+│       ├── audit_exporter.py            SHA-256 Merkle tree, evaluation harness
+│       ├── vector_tensor.py             Research: 3D tensor core & Sinkhorn optimal transport
+│       ├── graph_solver.py              Research: bipartite graph partitioning & lifecycle DAGs
+│       ├── conformal_verifier.py        Conformal risk control & Merkle audit tree
+│       └── agents/
+│           ├── decision_maker_agent.py  Autonomous 1:1 mutex decision maker
+│           ├── narration_parser_agent.py Regex + semantic token extractor for bank narrations
+│           ├── discrepancy_agent.py     MDR fee (2%) + GST (18%) forensic decomposition
+│           ├── erp_voucher_agent.py     Double-entry journal vouchers (Tally XML / Zoho JSON)
+│           ├── bank_dispute_agent.py    Statutory dispute letters (PSS Act 2007 / NPCI Form-1)
+│           └── assistant_agent.py       RAG Financial Copilot (Gemini + rule-based fallback)
+├── frontend/                            React 19 + Vite 8 — 15 dedicated dashboard views
+├── backend/tests/                       22 test suites across matching, scoring, API, and tensors
+├── render.yaml                          Render.com deployment blueprint (backend + frontend)
+├── run_reconx.py                        One-click dual-server launcher
+└── requirements.txt                     Python dependencies
 ```
 
 ---
 
-## API surface
+## API Reference
 
-| Endpoint | Method | Purpose |
+| Endpoint | Method | Description |
 |:---|:---:|:---|
-| `POST /upload` | Multipart | Ingests 2–3 CSV sources or generates a synthetic test batch (`generate_synthetic=true`) |
-| `POST /run/{run_id}` | JSON | Triggers the autonomous multi-tier reconciliation pipeline |
-| `GET /run/{run_id}/status` | Polling | Returns real-time execution progress, active agent stage, and processed count |
-| `GET /run/{run_id}/summary` | JSON | Returns executive KPIs, match rates, discrepancy counts, and Merkle root hash |
-| `GET /run/{run_id}/transactions`| Query | Returns filtered master transaction list with confidence scores and signals |
-| `GET /run/{run_id}/transaction/{id}`| JSON | Returns single-transaction forensic evidence trail and agent trace steps |
-| `GET /run/{run_id}/discrepancies` | JSON | Returns fee deductions, 18% GST splits, and timing lag breakdowns |
-| `GET /run/{run_id}/exceptions` | JSON | Returns segregated bank orphans and ledger orphans with leakage exposure |
-| `GET /run/{run_id}/vouchers` | JSON/XML | Auto-generates balanced double-entry accounting vouchers (Tally XML / Zoho JSON) |
-| `GET /run/{run_id}/disputes` | JSON | Generates formal statutory NPCI Form-1 dispute recovery notice letters |
-| `GET /run/{run_id}/audit-dossier` | JSON | Exports RBI Master Direction Section 25A Statutory Audit Dossier |
-| `POST /run/{run_id}/recompute` | JSON | Recomputes threshold classification in $< 20\text{ms}$ without re-running pipeline |
-| `POST /chat` | JSON | RAG-grounded Financial Copilot assistant for conversational treasury queries |
+| `POST /upload` | Multipart | Upload 2–3 CSV sources or generate a synthetic batch |
+| `POST /run/{run_id}` | JSON | Trigger the reconciliation pipeline |
+| `GET /run/{run_id}/status` | JSON | Real-time progress: agent stage, processed count |
+| `GET /run/{run_id}/summary` | JSON | Executive KPIs, match rates, Merkle root hash |
+| `GET /run/{run_id}/transactions` | Query | Filtered transaction list with confidence scores |
+| `GET /run/{run_id}/transaction/{id}` | JSON | Single-transaction forensic trace |
+| `GET /run/{run_id}/discrepancies` | JSON | MDR fee splits, GST deductions, timing lags |
+| `GET /run/{run_id}/exceptions` | JSON | Bank orphans and ledger orphans |
+| `GET /run/{run_id}/erp-vouchers` | JSON/XML | Auto-generated double-entry accounting vouchers |
+| `GET /run/{run_id}/disputes` | JSON | NPCI Form-1 statutory dispute letters |
+| `GET /run/{run_id}/statutory-dossier` | JSON | RBI §25A audit dossier export |
+| `POST /run/{run_id}/recompute` | JSON | Recompute threshold classification without re-running |
+| `POST /chat` | JSON | Natural language Financial Copilot query |
 
-*Interactive OpenAPI Swagger documentation available at `/docs` when the backend is running.*
+Full interactive documentation available at `/docs` (Swagger UI).
 
 ---
 
-## Architecture & Engineering Design Decisions
+## Design Decisions
 
-### 1. Dual-Tier Strategy: Why We Decoupled Production Fast-Path from R&D Sinkhorn Suite
+### 1. Why Not Use LLMs or External AI APIs?
 
-ReconX cleanly decouples real-time operational execution from academic batch optimization. We deliberately chose **not** to run Sinkhorn Optimal Transport and dense 3D Tensor Contractions inside the live API request loop based on concrete systems and hardware constraints:
+Three concrete constraints rule out cloud LLM approaches for Indian fintech reconciliation:
 
-| Evaluation Dimension | Live Production Pipeline (`matcher.py`, `scorer.py`) | R&D Research Suite (`vector_tensor.py`, Sinkhorn) |
+- **Regulatory:** RBI Nodal Escrow guidelines and the DPDP Act 2023 restrict exporting raw transaction PII to external third-party systems. Statutory audits require fully deterministic, reproducible outputs.
+- **Accounting Semantics:** Double-entry bookkeeping requires discrete binary decisions — a transaction is either matched or it is not. Probabilistic soft scores from LLMs are incompatible with general ledger posting rules.
+- **Operational Cost & Latency:** At NPCI-scale volumes, per-token API costs and 1–3 second LLM inference latency are operationally unviable.
+
+### 2. Production Fast-Path vs. Research Suite
+
+ReconX separates two execution modes intentionally:
+
+| | Production Pipeline | Research Suite |
 |:---|:---|:---|
-| **Computational Complexity** | **$\mathcal{O}(1)$** inverted index lookup per transaction | **$\mathcal{O}(M \times N)$** dense matrix scaling |
-| **Memory Allocation (10k rows)** | **$< 10\text{ MB}$** RAM overhead | **$\approx 4\text{ GB}$** RAM ($500\text{M}$ float64 tensor values) |
-| **Local Machine Performance** | Instant response, zero CPU freezing ($< 2.1\text{s}$ per 1k batch) | High CPU core saturation, disk swapping, browser timeout |
-| **Mathematical Output** | **Discrete 1:1 statutory match** or AML quarantine | Continuous soft probability distribution (e.g. 42% / 38%) |
-| **Statutory Accounting Fit** | Compliant with double-entry ERP vouchers & Merkle trees | Incompatible with discrete general ledger posting |
-| **UI Multi-Agent Trace** | Emits real-time chronological thought cards for React UI | Black-box numerical solver with no reasoning trail |
+| **Files** | `matcher.py`, `scorer.py`, `orchestrator.py` | `vector_tensor.py`, `graph_solver.py` |
+| **Complexity** | O(1) inverted index | O(M×N) dense tensor |
+| **Memory (10k rows)** | < 10 MB | ~4 GB |
+| **Output** | Discrete 1:1 match or quarantine | Continuous probability distribution |
+| **ERP Compatibility** | Direct journal voucher posting | Incompatible with discrete ledger entries |
 
-- **Live Production Pipeline (`engine/matcher.py`, `engine/scorer.py`, `engine/orchestrator.py`):**  
-  Resolves clean transactions in $< 0.2\text{ms}$ via an $\mathcal{O}(1)$ Inverted Multi-Index (`utr_to_ledger`, `inv_to_ledger`), falling back to orthogonal 5-channel heuristic scoring for messy narrations. This ensures the web application remains responsive and stable on standard hardware.
-- **R&D Benchmark Suite (`backend/engine/vector_tensor.py`, `tests/test_tensor_engine.py`):**  
-  Maintained as an offline research test harness to benchmark high-dimensional continuous assignment bounds and evaluate optimal transport formulations against discrete heuristic baselines.
+The Sinkhorn Optimal Transport and bipartite graph solver are maintained as an **offline research harness** (`tests/test_tensor_engine.py`) to benchmark theoretical assignment bounds, not as a live request-path component.
 
-### 2. 5-Channel Orthogonal Scoring Engine
-When UTRs are absent or truncated, candidate rows are scored using normalized orthogonal signals:
-- **Exact UTR Match ($w_0 = 0.45$):** Binary match on alphanumeric reference tokens.
-- **Invoice / Order Ref ($w_1 = 0.25$):** Substring and fuzzy token matching against narration metadata.
-- **Counterparty Name ($w_2 = 0.15$):** RapidFuzz token-sort similarity against merchant customer directories.
-- **Amount & MDR Kernel ($w_3 = 0.10$):** Gaussian tolerance kernel accounting for 0.5%–2.5% MDR gateway deductions and refunds.
-- **Date Decay Proximity ($w_4 = 0.05$):** Exponential decay within a 3-day statutory settlement window.
+### 3. Abstention Safety Invariant
 
-### 3. Zero-Guessing Safety Invariant ($\Delta < 0.08$)
-In financial auditing, **a false positive match is 10x more destructive than an un-reconciled item**. When competing ledger candidates have confidence scores separated by less than 8%:
-$$\text{If } S_1 \ge \tau \quad\land\quad (S_1 - S_2) < 0.08 \quad\land\quad S_2 > 0.65 \implies \text{Quarantine}$$
-The engine strictly abstains from guessing and routes the record to an AML Suspense Registry with transparent diagnostic root causes.
+In financial auditing, a false positive match is significantly more harmful than an unreconciled item. When two candidate matches have a confidence score gap below 8%:
 
-### 4. Non-Circular Conformal Risk Profiling
-Conformal calibration requires independent ground truth. ReconX binds directly to synthetic benchmark ground truth (`gt_is_match_map`) when available to compute mathematically sound finite-sample risk bounds ($\alpha \le 0.001$). On raw, unlabelled real-world CSV uploads where ground truth does not exist, the engine marks the calibration as `None` rather than synthesizing circular self-referential labels.
+```
+If S₁ ≥ τ  AND  (S₁ - S₂) < 0.08  AND  S₂ > 0.65  →  Quarantine
+```
 
-### 5. Conservation of Escrow Solvency Invariant
-$$\sum \text{Bank Inflows} - \sum \text{Settled Ledger Outflows} \equiv \Delta \text{Nodal Escrow Balance} \quad (\pm ₹1.00 \text{ rounding})$$
-Every transaction state transition is sealed in a binary SHA-256 Merkle Audit Tree (`MerkleAuditTree.build_merkle_root`), producing a 64-hex root hash that makes post-hoc ledger manipulation mathematically impossible.
+The engine routes these records to an AML Suspense Registry for human controller review rather than forcing a guess.
+
+### 4. Conformal Risk Control Scope
+
+Conformal calibration (Angelopoulos et al., Stanford / UC Berkeley) is applied **only when labelled ground truth exists** — specifically, against the synthetic benchmark dataset generated by `data_generator.py`. On real-world unlabelled CSV uploads, the engine marks calibration as `None` and does not attempt to self-generate circular labels. This is an intentional design boundary, not a limitation to be papered over.
+
+### 5. Conservation Invariant
+
+The engine tracks an escrow solvency equation:
+
+```
+Σ Bank Inflows − Σ Settled Ledger Outflows ≡ ΔNodal Escrow Balance  (± ₹1.00 rounding tolerance)
+```
+
+All finalized decisions are sealed in a SHA-256 Merkle tree, producing a 64-hex root hash. This makes post-hoc ledger manipulation detectable, though it does not replace a full cryptographic audit system.
 
 ---
 
-## Production Roadmap & Next Steps
+## Roadmap
 
-Each development session can build on this foundation:
-1. **Session 1 (This Phase 1 Slice):** End-to-end multi-tier matching engine, 4 cognitive agents + 2 action bots, 15 React 18 views, Merkle tree sealing, and R&D tensor test suite.
-2. **Session 2 (Storage & Streaming):** PostgreSQL/TimescaleDB persistence adapter (replacing in-memory `RunSession`), Apache Kafka / Redpanda event ingestion for real-time streaming webhook feeds.
-3. **Session 3 (Distributed Concurrency):** Redis distributed lock manager (`Redlock`) replacing in-memory `claimed_ledger_ids` for multi-worker scaling.
-4. **Session 4 (Enterprise Connectors):** Direct REST/SFTP polling connectors for HDFC/ICICI nodal host-to-host bank statement feeds and SAP S/4HANA OData voucher posting.
+| Phase | Target Capabilities |
+|:---|:---|
+| **Phase 1 (Current)** | End-to-end matching pipeline, 4 agents, 15 React views, Merkle sealing, research tensor suite |
+| **Phase 2** | PostgreSQL/TimescaleDB persistence, Apache Kafka streaming ingestion, replacing in-memory `RunSession` |
+| **Phase 3** | Redis distributed lock (`Redlock`) for multi-worker horizontal scaling |
+| **Phase 4** | Direct SFTP/REST connectors for HDFC/ICICI host-to-host nodal feeds; SAP S/4HANA OData voucher posting |
 
 ---
 
 ## Engineering Notes
 
-- **In-Memory Store:** The default execution uses in-process memory sessions (`RUNS` dictionary in `backend/main.py`), keeping tests, demos, and local runs completely frictionless without requiring Docker or database setup.
-- **Data Residency (DPDP Act 2023):** Core matching, discrepancy decomposition, voucher generation, and Merkle tree hashing execute 100% locally on CPU with zero network egress of financial records.
-- **Simulation Sandbox:** The frontend includes 6 pre-configured treasury edge-case scenarios (mass refund storm, RTGS timing lag, MDR overcharge) that post to `/upload` exactly as real external feeds would.
+- **In-Memory Store:** All run sessions are held in a Python dictionary (`RUNS` in `backend/main.py`). This means run data does not persist across server restarts. This is intentional for the prototype — a database adapter is the Phase 2 priority.
+- **Data Residency:** Core matching, decomposition, voucher generation, and Merkle hashing execute entirely on-process with no network egress of financial records, consistent with DPDP Act 2023 data localisation expectations.
+- **Simulation Scenarios:** The frontend includes 6 pre-configured treasury edge-case scenarios (mass refund storm, RTGS timing lag, MDR overcharge) accessible from the Scenarios view.
+- **Free-Tier Deployment:** The live demo runs on Render's free tier. The backend instance sleeps after 15 minutes of inactivity and takes ~30–50 seconds to wake up on the first request.
 
 ---
 
 Developed for **Track 04: AI Finance Controller** at **Razorpay Buildathon 2026**.  
-*Licensed under the [MIT License](LICENSE).*
+Licensed under the [MIT License](LICENSE).
