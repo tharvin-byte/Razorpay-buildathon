@@ -25,8 +25,8 @@ class ReconciliationOrchestrator:
     """
     Core Pipeline Orchestrator (Next-Gen Neuro-Symbolic):
     Executes multi-phase reconciliation across bank, ledger, and settlement sources.
-    Integrates 3D Multi-Signal Hybrid Tensors, Bipartite Graph Netting,
-    Stanford Conformal Risk Control (CRC), and Cryptographic Merkle Attestation.
+    Integrates multi-signal matching, bipartite assignment,
+    empirical threshold selection, and SHA-256 result digests.
     """
     
     def __init__(
@@ -71,7 +71,7 @@ class ReconciliationOrchestrator:
         total_bank = len(bank_records)
         
         # -------------------------------------------------------------
-        # Phase A: Forward Pass (Bank Statement Records via Tensor Core)
+        # Phase A: Forward Pass (Bank Statement Records via Multi-Signal Matcher)
         # -------------------------------------------------------------
         for idx, b_rec in enumerate(bank_records):
             if progress_callback:
@@ -106,6 +106,7 @@ class ReconciliationOrchestrator:
         # Phase C: Cryptographic Merkle Root & Conformal Risk Calibration
         # -------------------------------------------------------------
         reconciled_dicts = []
+        merkle_payload_by_record = {}
         conf_scores = []
         
         # Ground-Truth Binding: If independent ground_truth is provided (e.g. synthetic benchmarks),
@@ -128,15 +129,32 @@ class ReconciliationOrchestrator:
                 # Genuine independent label from ground truth; defaults to False if unmapped/orphan
                 ground_truth_labels.append(gt_is_match_map.get(b_id, False))
 
-            reconciled_dicts.append({
+            ledger_ids = list(r.matched_ledger_ids or [])
+            if r.matched_ledger_record and r.matched_ledger_record.ledger_entry_id not in ledger_ids:
+                ledger_ids.insert(0, r.matched_ledger_record.ledger_entry_id)
+            payload = {
                 "bank_id": b_id,
                 "ledger_id": r.matched_ledger_record.ledger_entry_id if r.matched_ledger_record else "",
+                "ledger_ids": ledger_ids,
                 "amount": r.bank_record.amount if r.bank_record else 0.0,
                 "utr": r.bank_record.utr_number if r.bank_record else "",
-                "status": r.status
-            })
+                "status": r.status,
+                "confidence": r.confidence_score,
+                "settlement_id": r.matched_settlement_record.network_settlement_id if r.matched_settlement_record else "",
+                "settlement_amount": r.matched_settlement_record.net_amount if r.matched_settlement_record else 0.0,
+                "gross_amount": r.matched_ledger_record.gross_amount if r.matched_ledger_record else 0.0,
+                "fee_amount": r.matched_ledger_record.razorpay_fee if r.matched_ledger_record else 0.0,
+                "refund_amount": r.matched_ledger_record.refund_amount if r.matched_ledger_record else 0.0,
+                "discrepancies": [d.model_dump() for d in r.discrepancies]
+            }
+            reconciled_dicts.append(payload)
+            merkle_payload_by_record[id(r)] = payload
 
         self.merkle_root = MerkleAuditTree.build_merkle_root(reconciled_dicts)
+        for result in self.results:
+            result.signals = result.signals.model_copy(update={
+                "merkle_leaf_hash": MerkleAuditTree.hash_leaf(merkle_payload_by_record[id(result)])
+            })
         
         if ground_truth_labels is not None:
             self.calibrated_threshold = self.conformal_verifier.calibrate_threshold(
@@ -160,6 +178,8 @@ class ReconciliationOrchestrator:
         exc_bank = 0
         exc_ledger = 0
         expected_non_match = 0
+        bank_matched = 0
+        matched_ledger_ids = set()
         
         disc_breakdown: Dict[str, int] = {
             "fee_deduction": 0,
@@ -170,14 +190,25 @@ class ReconciliationOrchestrator:
             "reference_formatting": 0,
             "duplicate_retry": 0,
             "unreconciled_amount_gap": 0,
+            "candidate_ambiguity": 0,
             "status_mismatch": 0
         }
         
         for r in self.results:
             if r.status == "matched_clean":
                 matched_clean += 1
+                if r.bank_record:
+                    bank_matched += 1
+                if r.matched_ledger_record:
+                    matched_ledger_ids.add(r.matched_ledger_record.ledger_entry_id)
+                matched_ledger_ids.update(r.matched_ledger_ids or [])
             elif r.status == "matched_with_discrepancy":
                 matched_disc += 1
+                if r.bank_record:
+                    bank_matched += 1
+                if r.matched_ledger_record:
+                    matched_ledger_ids.add(r.matched_ledger_record.ledger_entry_id)
+                matched_ledger_ids.update(r.matched_ledger_ids or [])
             elif r.status == "exception":
                 if r.exception_side == "bank":
                     exc_bank += 1
@@ -192,6 +223,16 @@ class ReconciliationOrchestrator:
 
         total_txns = len(self.results)
         match_rate = round((matched_clean + matched_disc) / total_txns, 4) if total_txns > 0 else 0.0
+        bank_match_rate = round(bank_matched / len(self.bank_df), 4) if len(self.bank_df) else 0.0
+        eligible_ledger = self.ledger_df
+        if "status" in eligible_ledger.columns:
+            eligible_ledger = eligible_ledger[eligible_ledger["status"].astype(str).str.lower() != "failed"]
+        ledger_coverage_rate = round(
+            len(matched_ledger_ids) / len(eligible_ledger), 4
+        ) if len(eligible_ledger) else 0.0
+        overall_resolution_rate = round(
+            (matched_clean + matched_disc + expected_non_match) / total_txns, 4
+        ) if total_txns else 0.0
         
         eval_metrics = None
         if self.ground_truth:
@@ -208,9 +249,18 @@ class ReconciliationOrchestrator:
             exception_ledger_count=exc_ledger,
             expected_non_match_count=expected_non_match,
             match_rate=match_rate,
+            bank_match_rate=bank_match_rate,
+            ledger_coverage_rate=ledger_coverage_rate,
+            overall_resolution_rate=overall_resolution_rate,
+            total_result_records=total_txns,
+            bank_matched_records=bank_matched,
+            eligible_ledger_records=len(eligible_ledger),
+            matched_ledger_records=len(matched_ledger_ids),
+            resolved_result_records=matched_clean + matched_disc + expected_non_match,
             discrepancy_breakdown=disc_breakdown,
             current_threshold=self.confidence_threshold,
             merkle_root_hash=self.merkle_root,
-            conformal_calibrated_threshold=self.calibrated_threshold,
+            conformal_calibrated_threshold=None,
+            empirical_selected_threshold=self.calibrated_threshold,
             evaluation=eval_metrics
         )

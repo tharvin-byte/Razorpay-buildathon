@@ -2,7 +2,6 @@ import os
 import re
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from dotenv import load_dotenv
 from backend.models.schemas import DiscrepancyDetail
 
 class DiscrepancyDecompositionAgent:
@@ -17,22 +16,6 @@ class DiscrepancyDecompositionAgent:
     """
     
     ROUNDING_TOLERANCE = 1.00  # ₹1.00
-    _gemini_client = None
-    _client_initialized = False
-    
-    @classmethod
-    def _get_gemini_client(cls):
-        if not cls._client_initialized:
-            cls._client_initialized = True
-            load_dotenv(override=True)
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if api_key and len(api_key) > 10:
-                try:
-                    from google import genai
-                    cls._gemini_client = genai.Client(api_key=api_key)
-                except Exception:
-                    cls._gemini_client = None
-        return cls._gemini_client
 
     @classmethod
     def analyze_matched_pair(
@@ -59,7 +42,7 @@ class DiscrepancyDecompositionAgent:
             discrepancies.append(
                 DiscrepancyDetail(
                     type="partial_refund",
-                    description=f"Customer refund clawback of ₹{refund:,.2f} deducted prior to net payout",
+                    description=f"Customer refund clawback of â‚¹{refund:,.2f} deducted prior to net payout",
                     impact_amount=refund
                 )
             )
@@ -70,7 +53,7 @@ class DiscrepancyDecompositionAgent:
                 discrepancies.append(
                     DiscrepancyDetail(
                         type="rounding_difference",
-                        description=f"Fractional paisa rounding variance of ₹{abs(net_delta):.2f} on GST fee computation",
+                        description=f"Fractional paisa rounding variance of â‚¹{abs(net_delta):.2f} on GST fee computation",
                         impact_amount=abs(net_delta)
                     )
                 )
@@ -81,8 +64,8 @@ class DiscrepancyDecompositionAgent:
                         DiscrepancyDetail(
                             type="batch_settlement",
                             description=(
-                                f"Consolidated batch settlement: Bank credit ₹{bank_amt:,.2f} represents bundled multi-order "
-                                f"payout exceeding single invoice net ₹{expected_net:,.2f} by ₹{net_delta:,.2f}"
+                                f"Consolidated batch settlement: Bank credit â‚¹{bank_amt:,.2f} represents bundled multi-order "
+                                f"payout exceeding single invoice net â‚¹{expected_net:,.2f} by â‚¹{net_delta:,.2f}"
                             ),
                             impact_amount=net_delta
                         )
@@ -91,7 +74,7 @@ class DiscrepancyDecompositionAgent:
                     discrepancies.append(
                         DiscrepancyDetail(
                             type="rounding_difference",
-                            description=f"Unallocated credit variance of ₹{net_delta:,.2f}",
+                            description=f"Unallocated credit variance of â‚¹{net_delta:,.2f}",
                             impact_amount=net_delta
                         )
                     )
@@ -99,7 +82,7 @@ class DiscrepancyDecompositionAgent:
                 discrepancies.append(
                     DiscrepancyDetail(
                         type="unreconciled_amount_gap",
-                        description=f"Abnormal gateway fee deduction gap of ₹{abs(net_delta):,.2f} requiring inquiry",
+                        description=f"Abnormal gateway fee deduction gap of â‚¹{abs(net_delta):,.2f} requiring inquiry",
                         impact_amount=abs(net_delta)
                     )
                 )
@@ -149,7 +132,7 @@ class DiscrepancyDecompositionAgent:
         discrepancies: List[DiscrepancyDetail]
     ) -> str:
         """
-        Pristine Executive Financial Story Format (No emojis, Big-4 Workpaper compliant):
+        Pristine Executive Financial Story Format (No emojis, formatted for operational review):
         DIAGNOSIS: ...
         ROOT CAUSE: ...
         FINANCIAL BREAKDOWN: ...
@@ -187,31 +170,31 @@ class DiscrepancyDecompositionAgent:
                 f"Clean Parity Settlement (100% Parity Match with Zero Variance)\n\n"
                 f"ROOT CAUSE:\n"
                 f"Customer {name} settled Invoice {inv} ({ledger_id}). Razorpay deducted the contracted "
-                f"{fee_pct:.1f}% MDR processing charge (₹{fee:,.2f}) and disbursed exact net proceeds on the same business day.\n\n"
+                f"{fee_pct:.1f}% MDR processing charge (â‚¹{fee:,.2f}) and disbursed exact net proceeds on the same business day.\n\n"
                 f"FINANCIAL BREAKDOWN:\n"
-                f"Gross Invoiced Amount : ₹{gross_amt:,.2f}\n"
-                f"(-) Gateway MDR Fee   : -₹{fee:,.2f} ({fee_pct:.1f}% Processing Fee)\n"
-                f"Expected Net Payout   : ₹{expected_net:,.2f}\n"
-                f"Bank Deposit Received : ₹{bank_amt:,.2f} [EXACT PARITY MATCH]\n\n"
+                f"Gross Invoiced Amount : â‚¹{gross_amt:,.2f}\n"
+                f"(-) Gateway MDR Fee   : -â‚¹{fee:,.2f} ({fee_pct:.1f}% Processing Fee)\n"
+                f"Expected Net Payout   : â‚¹{expected_net:,.2f}\n"
+                f"Bank Deposit Received : â‚¹{bank_amt:,.2f} [EXACT PARITY MATCH]\n\n"
                 f"STATUS & ACTION:\n"
                 f"Resolution Status : Auto-Cleared & Verified\n"
                 f"Controller Action : None Required. Approved for automated ERP general ledger posting.\n\n"
                 f"AUDIT PROOF:\n"
-                f"Statutory UTR Reference '{utr}' verified with {score_pct} conformal confidence."
+                f"Recorded UTR reference '{utr}' verified with {score_pct} candidate score."
             )
 
         # 2. Batch Settlement Consolidation
         if has_batch:
             return (
                 f"DIAGNOSIS:\n"
-                f"Consolidated Batch Settlement (Bank inflow exceeds single order net by ₹{net_delta:,.2f})\n\n"
+                f"Consolidated Batch Settlement (Bank inflow exceeds single order net by â‚¹{net_delta:,.2f})\n\n"
                 f"ROOT CAUSE:\n"
                 f"Payment gateway bundled multiple merchant orders into a single consolidated bank payout to optimize "
-                f"interbank NEFT/RTGS clearinghouse overhead. Includes Order {inv} (₹{expected_net:,.2f} net) plus concurrent orders totaling ₹{net_delta:,.2f}.\n\n"
+                f"interbank NEFT/RTGS clearinghouse overhead. Includes Order {inv} (â‚¹{expected_net:,.2f} net) plus concurrent orders totaling â‚¹{net_delta:,.2f}.\n\n"
                 f"FINANCIAL BREAKDOWN:\n"
-                f"This Order Net Inflow : ₹{expected_net:,.2f} (Gross ₹{gross_amt:,.2f} − MDR ₹{fee:,.2f})\n"
-                f"Bundled Batch Orders  : +₹{net_delta:,.2f} (Concurrent merchant orders)\n"
-                f"Total Bank Deposit    : ₹{bank_amt:,.2f} [BATCH BALANCED]\n\n"
+                f"This Order Net Inflow : â‚¹{expected_net:,.2f} (Gross â‚¹{gross_amt:,.2f} âˆ’ MDR â‚¹{fee:,.2f})\n"
+                f"Bundled Batch Orders  : +â‚¹{net_delta:,.2f} (Concurrent merchant orders)\n"
+                f"Total Bank Deposit    : â‚¹{bank_amt:,.2f} [BATCH BALANCED]\n\n"
                 f"STATUS & ACTION:\n"
                 f"Resolution Status : Auto-Resolved via Multi-Leg Netting\n"
                 f"Controller Action : Synthesize Multi-Leg ERP Journal Voucher to clear linked invoice receivables.\n\n"
@@ -223,15 +206,15 @@ class DiscrepancyDecompositionAgent:
         if has_refund:
             return (
                 f"DIAGNOSIS:\n"
-                f"Customer Partial Refund Clawback (-₹{refund:,.2f} Deducted)\n\n"
+                f"Customer Partial Refund Clawback (-â‚¹{refund:,.2f} Deducted)\n\n"
                 f"ROOT CAUSE:\n"
                 f"Customer {name} initiated a partial return/cancellation for Order {inv}. Razorpay automatically clawed back "
-                f"the ₹{refund:,.2f} refund amount from the merchant payout pool prior to bank credit disbursal.\n\n"
+                f"the â‚¹{refund:,.2f} refund amount from the merchant payout pool prior to bank credit disbursal.\n\n"
                 f"FINANCIAL BREAKDOWN:\n"
-                f"Gross Invoiced Amount : ₹{gross_amt:,.2f}\n"
-                f"(-) Gateway MDR Fee   : -₹{fee:,.2f} ({fee_pct:.1f}% Processing Fee)\n"
-                f"(-) Customer Refund   : -₹{refund:,.2f} (Pre-disbursal return clawback)\n"
-                f"Bank Deposit Received : ₹{bank_amt:,.2f} [100% BALANCED]\n\n"
+                f"Gross Invoiced Amount : â‚¹{gross_amt:,.2f}\n"
+                f"(-) Gateway MDR Fee   : -â‚¹{fee:,.2f} ({fee_pct:.1f}% Processing Fee)\n"
+                f"(-) Customer Refund   : -â‚¹{refund:,.2f} (Pre-disbursal return clawback)\n"
+                f"Bank Deposit Received : â‚¹{bank_amt:,.2f} [100% BALANCED]\n\n"
                 f"STATUS & ACTION:\n"
                 f"Resolution Status : Auto-Resolved (Refund Verified)\n"
                 f"Controller Action : Post Credit Note / Customer Return Voucher in ERP to balance accounts receivable.\n\n"
@@ -243,18 +226,18 @@ class DiscrepancyDecompositionAgent:
         if has_unexplained:
             return (
                 f"DIAGNOSIS:\n"
-                f"Unexplained Fee Shortage / Overcharge Variance (-₹{abs(net_delta):,.2f})\n\n"
+                f"Unexplained Fee Shortage / Overcharge Variance (-â‚¹{abs(net_delta):,.2f})\n\n"
                 f"ROOT CAUSE:\n"
-                f"Bank received ₹{bank_amt:,.2f}, which is ₹{abs(net_delta):,.2f} below the expected net amount "
-                f"(₹{expected_net:,.2f}). Payment gateway deducted charges exceeding the contracted schedule without statutory justification.\n\n"
+                f"Bank received â‚¹{bank_amt:,.2f}, which is â‚¹{abs(net_delta):,.2f} below the expected net amount "
+                f"(â‚¹{expected_net:,.2f}). Payment gateway deducted charges exceeding the contracted schedule for reasons not recorded in the available data.\n\n"
                 f"FINANCIAL BREAKDOWN:\n"
-                f"Gross Invoiced Amount : ₹{gross_amt:,.2f}\n"
-                f"(-) Contracted MDR Fee: -₹{fee:,.2f} ({fee_pct:.1f}% Contracted Rate)\n"
-                f"Expected Net Payout   : ₹{expected_net:,.2f}\n"
-                f"Actual Bank Received  : ₹{bank_amt:,.2f} [VARIANCE DEFICIT: -₹{abs(net_delta):,.2f}]\n\n"
+                f"Gross Invoiced Amount : â‚¹{gross_amt:,.2f}\n"
+                f"(-) Contracted MDR Fee: -â‚¹{fee:,.2f} ({fee_pct:.1f}% Contracted Rate)\n"
+                f"Expected Net Payout   : â‚¹{expected_net:,.2f}\n"
+                f"Actual Bank Received  : â‚¹{bank_amt:,.2f} [VARIANCE DEFICIT: -â‚¹{abs(net_delta):,.2f}]\n\n"
                 f"STATUS & ACTION:\n"
                 f"Resolution Status : Flagged for Dispute / Claim Filing\n"
-                f"Controller Action : Action Required. Click 'Draft Dispute' to issue formal NPCI/Banking statutory recovery notice.\n\n"
+                f"Controller Action : Review the recorded discrepancy and supporting source data.\n\n"
                 f"AUDIT PROOF:\n"
                 f"Flagged under Bank UTR '{utr}'. Escalate to Payment Partner Settlement Operations."
             )
@@ -269,32 +252,32 @@ class DiscrepancyDecompositionAgent:
                 f"Customer {name} completed payment on {ledger_date} following daily banking clearinghouse cutoff. HDFC Nodal Escrow "
                 f"processed and credited payout on the subsequent business cycle ({bank_date}). Funds are fully accounted for.\n\n"
                 f"FINANCIAL BREAKDOWN:\n"
-                f"Gross Invoiced Amount : ₹{gross_amt:,.2f}\n"
-                f"(-) Gateway MDR Fee   : -₹{fee:,.2f} ({fee_pct:.1f}% Processing Fee)\n"
-                f"Expected Net Payout   : ₹{expected_net:,.2f}\n"
-                f"Bank Deposit Received : ₹{bank_amt:,.2f} [100% PARITY MATCH]\n\n"
+                f"Gross Invoiced Amount : â‚¹{gross_amt:,.2f}\n"
+                f"(-) Gateway MDR Fee   : -â‚¹{fee:,.2f} ({fee_pct:.1f}% Processing Fee)\n"
+                f"Expected Net Payout   : â‚¹{expected_net:,.2f}\n"
+                f"Bank Deposit Received : â‚¹{bank_amt:,.2f} [100% PARITY MATCH]\n\n"
                 f"STATUS & ACTION:\n"
                 f"Resolution Status : Auto-Resolved (Normal Clearing Cycle)\n"
                 f"Controller Action : None Required. Inter-period timing lag automatically reconciled.\n\n"
                 f"AUDIT PROOF:\n"
-                f"Verified with {score_pct} conformal confidence under Bank UTR '{utr}'."
+                f"Verified with {score_pct} candidate score under Bank UTR '{utr}'."
             )
 
         # 6. Fractional Paisa Rounding
         if has_rounding:
             return (
                 f"DIAGNOSIS:\n"
-                f"Fractional Paisa Tax Rounding Variance (₹{abs(net_delta):.2f})\n\n"
+                f"Fractional Paisa Tax Rounding Variance (â‚¹{abs(net_delta):.2f})\n\n"
                 f"ROOT CAUSE:\n"
-                f"Sub-rupee ₹{abs(net_delta):.2f} variance resulting from floating-point decimal rounding during 18% GST statutory "
+                f"Sub-rupee â‚¹{abs(net_delta):.2f} variance resulting from floating-point decimal rounding during 18% GST statutory "
                 f"tax calculation on merchant discount fees.\n\n"
                 f"FINANCIAL BREAKDOWN:\n"
-                f"Gross Invoiced Amount : ₹{gross_amt:,.2f}\n"
-                f"(-) Gateway MDR Fee   : -₹{fee:,.2f}\n"
-                f"Expected Net Payout   : ₹{expected_net:,.2f}\n"
-                f"Bank Deposit Received : ₹{bank_amt:,.2f} (Paisa Variance: ₹{abs(net_delta):.2f})\n\n"
+                f"Gross Invoiced Amount : â‚¹{gross_amt:,.2f}\n"
+                f"(-) Gateway MDR Fee   : -â‚¹{fee:,.2f}\n"
+                f"Expected Net Payout   : â‚¹{expected_net:,.2f}\n"
+                f"Bank Deposit Received : â‚¹{bank_amt:,.2f} (Paisa Variance: â‚¹{abs(net_delta):.2f})\n\n"
                 f"STATUS & ACTION:\n"
-                f"Resolution Status : Auto-Resolved (Within ₹1.00 Policy Tolerance)\n"
+                f"Resolution Status : Auto-Resolved (Within â‚¹1.00 Policy Tolerance)\n"
                 f"Controller Action : Post automated Rounding-Off ledger adjustment.\n\n"
                 f"AUDIT PROOF:\n"
                 f"Verified under Bank UTR '{utr}'."
@@ -305,9 +288,9 @@ class DiscrepancyDecompositionAgent:
             f"DIAGNOSIS:\n"
             f"Reconciled Settlement ({score_pct} Confidence Parity)\n\n"
             f"ROOT CAUSE:\n"
-            f"Bank credit {bank_id} (₹{bank_amt:,.2f}) matched Ledger {ledger_id} for {name} ({inv}).\n\n"
+            f"Bank credit {bank_id} (â‚¹{bank_amt:,.2f}) matched Ledger {ledger_id} for {name} ({inv}).\n\n"
             f"FINANCIAL BREAKDOWN:\n"
-            f"Gross: ₹{gross_amt:,.2f} | MDR Fee: -₹{fee:,.2f} | Net: ₹{bank_amt:,.2f}\n\n"
+            f"Gross: â‚¹{gross_amt:,.2f} | MDR Fee: -â‚¹{fee:,.2f} | Net: â‚¹{bank_amt:,.2f}\n\n"
             f"STATUS & ACTION:\n"
             f"Resolution Status : Auto-Resolved\n"
             f"Controller Action : Balanced and verified under Bank UTR '{utr}'."
@@ -321,7 +304,7 @@ class DiscrepancyDecompositionAgent:
         reason_hint: str = ""
     ) -> str:
         """
-        Pristine Enterprise Exception Notice (No emojis, Big-4 Workpaper compliant):
+        Pristine Enterprise Exception Notice (No emojis, formatted for operational review):
         """
         bank_id = bank_record.get("bank_txn_id", "")
         bank_amt = float(bank_record.get("amount", 0.0))
@@ -334,7 +317,7 @@ class DiscrepancyDecompositionAgent:
                 f"DIAGNOSIS:\n"
                 f"Duplicate Claim Conflict Quarantine (Target Ledger: {cand_id})\n\n"
                 f"ROOT CAUSE:\n"
-                f"Bank deposit {bank_id} (₹{bank_amt:,.2f}) matched internal ledger entry {cand_id}, but this ledger entry "
+                f"Bank deposit {bank_id} (â‚¹{bank_amt:,.2f}) matched internal ledger entry {cand_id}, but this ledger entry "
                 f"has already been claimed and settled by {claimed_by}.\n\n"
                 f"STATUS & ACTION:\n"
                 f"Resolution Status : Quarantined under Zero-Guessing Policy\n"
@@ -351,20 +334,20 @@ class DiscrepancyDecompositionAgent:
                 f"DIAGNOSIS:\n"
                 f"Ambiguous Match Deficit (Confidence Score: {score*100:.1f}%)\n\n"
                 f"ROOT CAUSE:\n"
-                f"Potential candidate Ledger entry {cand_id} ({cand_name}) matched partially, but failed the statutory 75.0% "
+                f"Potential candidate Ledger entry {cand_id} ({cand_name}) matched partially, but failed the configured 75.0% "
                 f"conformal certainty threshold due to missing UTR or conflicting counterparty metadata.\n\n"
                 f"STATUS & ACTION:\n"
                 f"Resolution Status : Quarantined for Human Controller Review\n"
                 f"Controller Action : Verify counterparty payment receipt before manual general ledger association.\n\n"
                 f"AUDIT PROOF:\n"
-                f"Multi-signal confidence ({score*100:.1f}%) below certified threshold."
+                f"Multi-signal confidence ({score*100:.1f}%) below configured threshold."
             )
             
         return (
             f"DIAGNOSIS:\n"
             f"Unidentified Bank Inflow (Bank Orphan Deposit)\n\n"
             f"ROOT CAUSE:\n"
-            f"External bank credit of ₹{bank_amt:,.2f} received with Bank UTR '{utr}', but no matching sales order, "
+            f"External bank credit of â‚¹{bank_amt:,.2f} received with Bank UTR '{utr}', but no matching sales order, "
             f"receivable, or invoice exists in merchant ERP database.\n\n"
             f"STATUS & ACTION:\n"
             f"Resolution Status : Quarantined in Suspense Account (AML Compliance)\n"

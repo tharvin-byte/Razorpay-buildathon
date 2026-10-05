@@ -8,8 +8,6 @@ from backend.engine.scorer import clean_str, clean_float
 from backend.engine.matcher import MatcherTool, BatchSettlementTool
 from backend.engine.agents.narration_parser_agent import NarrationParserAgent
 from backend.engine.agents.discrepancy_agent import DiscrepancyDecompositionAgent
-from backend.engine.vector_tensor import HybridTensorEngine, sinkhorn_bipartite_match
-from backend.engine.graph_solver import BipartiteGraphSolver
 from backend.engine.conformal_verifier import MerkleAuditTree
 
 def _clean_ledger_dict(d: Dict[str, Any]) -> Dict[str, Any]:
@@ -48,17 +46,14 @@ class DecisionMakerAgent:
     Decision Maker & Planner Agent (Autonomous Triage & Matching Coordinator):
     Conducts multi-tiered routing:
     1. Fast-Path O(1) Deterministic UTR Lookup (~65% traffic)
-    2. 3D Multi-Signal Hybrid Tensor Core + Sinkhorn Optimal Transport (< 5ms)
-    3. Bipartite Graph Connected Partitioning for N:1, 1:N, and M:N Netting
-    4. Conflict Detector & Zero-Guessing Ambiguity Quarantine (< 8% delta)
+    2. Multi-Signal Scoring Engine (Exact reference, fuzzy string, amount delta, date proximity)
+    3. Ambiguity Quarantine & Conflict Detection (Zero-Guessing policy)
     """
     
     def __init__(self, matcher: MatcherTool, confidence_threshold: float = 0.75):
         self.matcher = matcher
         self.confidence_threshold = confidence_threshold
         self.narration_agent = NarrationParserAgent()
-        self.tensor_engine = HybridTensorEngine()
-        self.graph_solver = BipartiteGraphSolver(tolerance=1.00)
 
     def process_bank_record(self, bank_record: Dict[str, Any]) -> ReconciliationResult:
         bank_record = dict(bank_record)
@@ -102,7 +97,7 @@ class DecisionMakerAgent:
                 f"Resolution Status : Quarantined in Suspense Account (AML Compliance)\n"
                 f"Controller Action : Issue inquiry to acquiring bank clearing desk for remitter attribution.\n\n"
                 f"AUDIT PROOF:\n"
-                f"Bank transaction {bank_txn_id} quarantined under zero-guessing statutory policy."
+                f"Bank transaction {bank_txn_id} was left unmatched because available evidence was insufficient."
             )
             return ReconciliationResult(
                 record_id=bank_txn_id,
@@ -137,13 +132,22 @@ class DecisionMakerAgent:
             )
             
             candidates = self.matcher.find_candidates(bank_record)
+            # If a UTR indexes several ledger legs, test the uniquely linked
+            # batch before the single-row fast path can claim only one leg.
+            batch_res = BatchSettlementTool.check_batch_settlement(bank_record, self.matcher)
+            if batch_res:
+                return batch_res
             if candidates:
                 top_cand = candidates[0]
                 l_rec = top_cand["ledger_record"]
                 score = top_cand["score"]
                 is_claimed = top_cand["is_claimed"]
                 
-                if score >= self.confidence_threshold:
+                # A shared exact UTR does not identify an individual ledger leg.
+                # Without an authoritative membership key, abstain even when one
+                # candidate happens to score higher than another.
+                exact_candidates_ambiguous = len(candidates) > 1
+                if score >= self.confidence_threshold and not exact_candidates_ambiguous:
                     if not is_claimed:
                         self.matcher.claim_ledger_row(l_rec["ledger_entry_id"], bank_txn_id)
                         
@@ -237,9 +241,9 @@ class DecisionMakerAgent:
             AgentTraceStep(
                 step_num=len(trace) + 1,
                 agent_name="Matcher",
-                action="3D Hybrid Tensor & Fuzzy Candidate Search",
+                action="Multi-Signal Candidate Search",
                 input_summary=f"Extracted: Name='{extracted_name}', Ref='{extracted_ref}'",
-                output_summary="Evaluated multi-signal tensor channels",
+                output_summary="Evaluated weighted matching signals",
                 reasoning=narr_reason
             )
         )
@@ -261,8 +265,28 @@ class DecisionMakerAgent:
                 second_score = candidates[1]["score"]
                 if score >= self.confidence_threshold and (score - second_score) < 0.08 and second_score > 0.65:
                     is_ambiguous = True
+
+            top_signals = top_cand.get("signals", {})
+            has_bank_utr = bool(bank_utr and bank_utr not in ("NONE", "NULL", "NAN"))
+            shared_utr_conflict = has_bank_utr and len(candidates) > 1
+            exact_reference_conflict = (
+                not has_bank_utr
+                and len(candidates) > 1
+                and bool(clean_str(extracted_ref))
+                and clean_str(extracted_ref).upper() in self.matcher.inv_to_ledger
+            )
+            if shared_utr_conflict or exact_reference_conflict:
+                is_ambiguous = True
+            no_utr_evidence_sufficient = (
+                (top_signals.get("invoice_ref_match", 0.0) >= 0.85
+                 and top_signals.get("amount_match", 0.0) >= 0.5)
+                or (top_signals.get("counterparty_name_sim", 0.0) >= 0.95
+                    and top_signals.get("amount_match", 0.0) >= 1.0
+                    and top_signals.get("date_proximity", 0.0) >= 0.85)
+            )
+            evidence_sufficient = has_bank_utr or no_utr_evidence_sufficient
                     
-            if score >= self.confidence_threshold and not is_ambiguous:
+            if score >= self.confidence_threshold and evidence_sufficient and not is_ambiguous:
                 if not is_claimed:
                     self.matcher.claim_ledger_row(l_rec["ledger_entry_id"], bank_txn_id)
                     settle_rec = self.matcher.find_settlement_record(l_rec.get("utr_number", ""), l_rec.get("invoice_ref", ""))
@@ -287,10 +311,10 @@ class DecisionMakerAgent:
                         AgentTraceStep(
                             step_num=len(trace) + 1,
                             agent_name="Discrepancy Agent",
-                            action="Resolve Matched Pair via Tensor Core",
+                            action="Resolve Matched Pair via Scoring Engine",
                             input_summary=f"Matched Ledger {l_rec['ledger_entry_id']} (Score: {score:.4f})",
                             output_summary=f"Status: {match_status}",
-                            reasoning=f"Resolved via 3D tensor extraction + subword scoring ({score*100:.1f}%)."
+                            reasoning=f"Resolved via multi-signal extraction and weighted scoring ({score*100:.1f}%)."
                         )
                     )
                     
@@ -315,26 +339,20 @@ class DecisionMakerAgent:
                         action="Zero-Guessing Ambiguity Quarantine",
                         input_summary=f"Top scores: {score:.3f} vs {candidates[1]['score']:.3f}",
                         output_summary="Flagged as honest exception (ambiguous)",
-                        reasoning="Multiple competing candidates with near-identical confidence. Refused to guess."
+                        reasoning="Multiple candidate records remain unresolved under the available identity evidence. Refused to guess."
                     )
                 )
-                cand_2 = candidates[1]["ledger_record"]
-                score_2 = candidates[1]["score"]
+                ambiguity_cause = (
+                    "The exact bank UTR maps to multiple ledger rows, and the current source model has no authoritative settlement-member key."
+                    if shared_utr_conflict else
+                    "The exact extracted reference maps to multiple ledger rows, and the available source fields do not identify one ledger entry."
+                    if exact_reference_conflict else
+                    "Multiple candidates have insufficient score separation under the configured ambiguity rule."
+                )
                 exc_reason = (
-                    f"DIAGNOSIS:\n"
-                    f"Ambiguous Competing Match Conflict (< 8% Score Differential)\n\n"
-                    f"ROOT CAUSE:\n"
-                    f"Multiple internal ERP ledger entries match bank deposit {bank_txn_id} (₹{bank_amt:,.2f}) with competing confidence: "
-                    f"{l_rec['ledger_entry_id']} ({score*100:.1f}%) vs {cand_2['ledger_entry_id']} ({score_2*100:.1f}%). Refused to guess under Zero-Guessing Policy.\n\n"
-                    f"FINANCIAL BREAKDOWN:\n"
-                    f"Bank Inflow Amount       : ₹{bank_amt:,.2f}\n"
-                    f"Candidate 1 Expected Net : ₹{float(l_rec.get('gross_amount', 0)) - float(l_rec.get('razorpay_fee', 0)):,.2f} ({l_rec.get('counterparty_name', 'Customer')})\n"
-                    f"Candidate 2 Expected Net : ₹{float(cand_2.get('gross_amount', 0)) - float(cand_2.get('razorpay_fee', 0)):,.2f} ({cand_2.get('counterparty_name', 'Customer')})\n\n"
-                    f"STATUS & ACTION:\n"
-                    f"Resolution Status : Quarantined under Zero-Guessing Policy\n"
-                    f"Controller Action : Human controller verification required before manual general ledger posting.\n\n"
-                    f"AUDIT PROOF:\n"
-                    f"Ambiguity delta {(score - score_2)*100:.1f}% below statutory confidence threshold."
+                    "DIAGNOSIS:\nAmbiguous Candidate Conflict\n\n"
+                    f"ROOT CAUSE:\n{ambiguity_cause}\n\n"
+                    "STATUS & ACTION:\nHeld for review. No ledger record was claimed. Review source references and provide an authoritative batch-member relationship if this represents a multi-row settlement."
                 )
                 return ReconciliationResult(
                     record_id=bank_txn_id,
@@ -343,10 +361,10 @@ class DecisionMakerAgent:
                     status="exception",
                     confidence_score=score,
                     signals=SignalBreakdown(**top_cand["signals"]),
-                    discrepancies=[DiscrepancyDetail(type="unreconciled_amount_gap", description="Ambiguous multiple candidates", impact_amount=bank_amt)],
+                    discrepancies=[DiscrepancyDetail(type="candidate_ambiguity", description=ambiguity_cause, impact_amount=0.0)],
                     explanation=exc_reason,
                     exception_side="bank",
-                    exception_reason="Ambiguous candidates with close confidence scores.",
+                    exception_reason=ambiguity_cause,
                     trace=trace
                 )
 

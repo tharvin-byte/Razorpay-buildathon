@@ -3,6 +3,8 @@ import os
 import json
 from typing import Dict, Any, Tuple, Optional
 
+from backend.engine.llm_gateway import generate_content
+
 class NarrationParserAgent:
     """
     Narration Parser Agent (Text Reader & Linguistic Normalizer):
@@ -18,21 +20,13 @@ class NarrationParserAgent:
         re.compile(r"RTGS-(?P<ifsc>[A-Z]{4}\d{7})-(?P<name>[A-Z0-9\s]+)-(?P<ref>[A-Z0-9_-]+)", re.IGNORECASE),
         re.compile(r"BULK-SETTLEMENT-(?P<merchant>[A-Z0-9_-]+)-(?P<ref>[A-Z0-9_-]+)", re.IGNORECASE),
         re.compile(r"TRF\s+FRM\s+(?P<name>[A-Z\s]+?)\s+FOR\s+(?:BILL|INV|ORDER)?\s*#?\s*(?P<ref>[A-Z0-9_-]+)", re.IGNORECASE),
+        re.compile(r"(?:UPI|IMPS|NEFT|CMS|POS)/(?P<name>[A-Z0-9\s]+)/(?P<ref>(?:INV|ORD|BILL|REF|TXN)[A-Z0-9_-]*)", re.IGNORECASE),
         re.compile(r"(?:UPI|IMPS|NEFT|CMS|POS)/(?P<ref>[A-Z0-9_-]+)/(?P<name>[A-Z0-9\s]+)", re.IGNORECASE)
     ]
     
     def __init__(self, use_llm: bool = True):
         self.use_llm = use_llm
-        self.api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        self.client = None
         self._template_cache: Dict[str, Dict[str, str]] = {}
-        
-        if self.use_llm and self.api_key:
-            try:
-                from google import genai
-                self.client = genai.Client(api_key=self.api_key)
-            except Exception:
-                self.client = None
 
     @staticmethod
     def normalize_delimiters(text: str) -> str:
@@ -50,20 +44,20 @@ class NarrationParserAgent:
         if not narration:
             return None
             
-        narration_str = self.normalize_delimiters(narration)
-        for pat in self.PATTERNS:
-            match = pat.search(narration_str)
-            if match:
-                data = match.groupdict()
-                return {
-                    "extracted_name": data.get("name", "").strip(),
-                    "extracted_ref": data.get("ref", "").strip(),
-                    "method": "regex"
-                }
+        for text in (narration, self.normalize_delimiters(narration)):
+            for pat in self.PATTERNS:
+                match = pat.search(text)
+                if match:
+                    data = match.groupdict()
+                    return {
+                        "extracted_name": data.get("name", "").strip(),
+                        "extracted_ref": data.get("ref", "").strip(),
+                        "method": "regex"
+                    }
         return None
 
     def extract_with_llm(self, narration: str) -> Optional[Dict[str, str]]:
-        if not self.client:
+        if not self.use_llm:
             return None
             
         prompt = f"""You are an Indian bank narration text parser. Extract the counterparty person/company name and any invoice/order/bill reference from this bank narration string.
@@ -72,12 +66,10 @@ Narration: "{narration}"
 Return ONLY a valid JSON object with keys "extracted_name" and "extracted_ref". If not found, set them to empty strings.
 Example output: {{"extracted_name": "RAMESH KUMAR", "extracted_ref": "INV1024"}}"""
 
+        text = generate_content(prompt, model='gemini-2.5-flash')
+        if not text:
+            return None
         try:
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-            )
-            text = response.text.strip()
             if text.startswith("```json"):
                 text = text[7:]
             if text.startswith("```"):
@@ -134,7 +126,7 @@ Example output: {{"extracted_name": "RAMESH KUMAR", "extracted_ref": "INV1024"}}
             reasoning = f"Extracted via token heuristics: Name='{heur_res['extracted_name']}', Ref='{heur_res['extracted_ref']}'"
             return heur_res, reasoning
 
-        if self.client:
+        if self.use_llm:
             llm_res = self.extract_with_llm(narration)
             if llm_res and (llm_res["extracted_name"] or llm_res["extracted_ref"]):
                 self._template_cache[fingerprint] = llm_res
