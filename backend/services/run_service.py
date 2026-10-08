@@ -1,61 +1,54 @@
 import logging
-import threading
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-import pandas as pd
+from typing import Any, Optional, List
 
-from backend.models.schemas import (
-    ReconciliationResult, SummaryResponse
-)
+from backend.models.schemas import SummaryResponse
 from backend.engine.data_generator import SyntheticDataGenerator
 from backend.engine.orchestrator import ReconciliationOrchestrator
-from backend.engine.agents.assistant_agent import ReconciliationAssistant
+from backend.services.run_repository import RunSession, InMemoryRunRepository
 
 logger = logging.getLogger("reconx.services.run")
 
-
-class RunSession:
-    def __init__(self, run_id: str):
-        self.run_id = run_id
-        now = datetime.now()
-        self.created_at = now.isoformat()
-        self.created_at_dt = now
-        self.started_at: Optional[datetime] = None
-        self.completed_at: Optional[datetime] = None
-        self.status = "idle"  # idle, uploading, running, completed, failed
-        self.processed = 0
-        self.total = 0
-        self.current_agent = "Initialized"
-        self.current_record = ""
-        self.error = None
-
-        self.bank_df: Optional[pd.DataFrame] = None
-        self.ledger_df: Optional[pd.DataFrame] = None
-        self.settlement_df: Optional[pd.DataFrame] = None
-        self.ground_truth: Optional[List[Dict[str, Any]]] = None
-
-        self.confidence_threshold: float = 0.75
-        self.orchestrator: Optional[ReconciliationOrchestrator] = None
-        self.results: List[ReconciliationResult] = []
-        self.summary: Optional[SummaryResponse] = None
-        self.assistant = ReconciliationAssistant()
-        self.operation_lock = threading.Lock()
-        self.sweep_points = None
+_repo = InMemoryRunRepository()
 
 
-class RunStore(dict):
-    def __getitem__(self, key):
-        if key == "demo-run-001" and key not in self:
+class RunStore:
+    def __init__(self, repo: InMemoryRunRepository):
+        self._repo = repo
+
+    def __getitem__(self, key: str) -> RunSession:
+        if key == "demo-run-001" and key not in self._repo:
             init_default_demo_run()
-        return super().__getitem__(key)
+        return self._repo[key]
 
-    def get(self, key, default=None):
-        if key == "demo-run-001" and key not in self:
+    def __setitem__(self, key: str, session: RunSession) -> None:
+        self._repo.save(session)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._repo
+
+    def get(self, key: str, default: Any = None) -> Optional[RunSession]:
+        if key == "demo-run-001" and key not in self._repo:
             init_default_demo_run()
-        return super().get(key, default)
+        return self._repo.get(key, default)
+
+    def keys(self):
+        return self._repo.keys()
+
+    def values(self):
+        return self._repo.values()
+
+    def items(self):
+        return self._repo.items()
+
+    def __iter__(self):
+        return iter(self._repo)
+
+    def __len__(self):
+        return len(self._repo)
 
 
-RUNS: Dict[str, RunSession] = RunStore()
+RUNS: RunStore = RunStore(_repo)
 
 
 def get_session(run_id: str) -> Optional[RunSession]:

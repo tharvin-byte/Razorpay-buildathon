@@ -1,12 +1,10 @@
 import sys
-import os
 import pandas as pd
 
 # Ensure UTF-8 console output
 sys.stdout.reconfigure(encoding='utf-8')
 
 from backend.engine.orchestrator import ReconciliationOrchestrator
-from backend.models.schemas import ReconciliationResult
 
 def test_realtime_conflict_cases():
     print("=" * 85)

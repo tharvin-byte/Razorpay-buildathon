@@ -1,9 +1,12 @@
-import re
+import logging
 import os
+import re
 import json
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Tuple, Optional
 
 from backend.engine.llm_gateway import generate_content
+
+logger = logging.getLogger("reconx.agents.narration_parser")
 
 class NarrationParserAgent:
     """
@@ -24,8 +27,14 @@ class NarrationParserAgent:
         re.compile(r"(?:UPI|IMPS|NEFT|CMS|POS)/(?P<ref>[A-Z0-9_-]+)/(?P<name>[A-Z0-9\s]+)", re.IGNORECASE)
     ]
     
-    def __init__(self, use_llm: bool = True):
-        self.use_llm = use_llm
+    def __init__(self, use_llm: Optional[bool] = None):
+        if use_llm is None:
+            self.use_llm = (
+                os.environ.get("ENABLE_LLM_NARRATION", "false").lower() in ("true", "1")
+                and "PYTEST_CURRENT_TEST" not in os.environ
+            )
+        else:
+            self.use_llm = bool(use_llm) and ("PYTEST_CURRENT_TEST" not in os.environ)
         self._template_cache: Dict[str, Dict[str, str]] = {}
 
     @staticmethod
@@ -66,7 +75,7 @@ Narration: "{narration}"
 Return ONLY a valid JSON object with keys "extracted_name" and "extracted_ref". If not found, set them to empty strings.
 Example output: {{"extracted_name": "RAMESH KUMAR", "extracted_ref": "INV1024"}}"""
 
-        text = generate_content(prompt, model='gemini-2.5-flash')
+        text = generate_content(prompt)
         if not text:
             return None
         try:
@@ -82,7 +91,8 @@ Example output: {{"extracted_name": "RAMESH KUMAR", "extracted_ref": "INV1024"}}
                 "extracted_ref": str(data.get("extracted_ref", "")).strip(),
                 "method": "llm_gemini"
             }
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed parsing LLM narration response: %s", e)
             return None
 
     def heuristic_fallback(self, narration: str) -> Dict[str, str]:

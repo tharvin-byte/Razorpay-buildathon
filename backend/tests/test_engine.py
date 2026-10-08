@@ -1,11 +1,6 @@
-import pytest
-import pandas as pd
-import json
 from backend.engine.data_generator import SyntheticDataGenerator
 from backend.engine.scorer import ScoringTool
-from backend.engine.matcher import MatcherTool
 from backend.engine.orchestrator import ReconciliationOrchestrator
-from backend.engine.audit_exporter import EvaluationHarness
 
 def test_synthetic_data_generation():
     gen = SyntheticDataGenerator(seed=101)
@@ -69,7 +64,7 @@ def test_missing_utr_fuzzy_scoring():
         extracted_ref="INV500"
     )
     # Ref match (0.25) + Name match (0.15) + Amount match (0.10) + Date (0.05) = 0.55
-    assert score_res["total_score"] >= 0.50
+    assert score_res["total_score"] >= 0.75
     assert score_res["signals"]["invoice_ref_match"] == 1.0
     assert score_res["signals"]["counterparty_name_sim"] >= 0.9
 

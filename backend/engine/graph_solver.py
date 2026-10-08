@@ -8,10 +8,10 @@ Implements:
 2. Transaction Lifecycle DAG Netting (ICLR - Rossi et al.):
    - Nets parent charges against child credit notes, partial refunds, and dispute debits.
 3. Strict Conservation of Money Invariant (|∑ Bank - ∑ Ledger| <= ₹1.00):
-   - Guarantees zero financial hallucinations and statutory RBI Escrow compliance.
+   - Provides graph-based candidate grouping; it does not establish regulatory compliance.
 """
 
-from typing import List, Dict, Any, Tuple, Optional, Set
+from typing import List, Dict, Any
 import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components

@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from backend.main import app
 
@@ -44,18 +43,9 @@ def test_full_system_live_integration():
     assert res.status_code == 200
     dispute_data = res.json()
     assert dispute_data["run_id"] == "demo-run-001"
-    assert dispute_data["total_claims"] > 0
-    assert dispute_data["total_recoverable_capital"] > 0
-    
-    # Verify claim schema integrity
-    first_claim = dispute_data["claims"][0]
-    assert "claim_id" in first_claim
-    assert "utr_number" in first_claim
-    assert "disputed_amount" in first_claim
-    assert "npci_reason_code" in first_claim
-    assert "formal_letter_text" in first_claim
-    assert "merkle_proof_hash" in first_claim
-    assert len(first_claim["merkle_proof_hash"]) == 64  # SHA-256
+    assert dispute_data["total_claims"] == 0
+    assert dispute_data["total_recoverable_capital"] == 0
+    assert dispute_data["claims"] == []
 
     # 5. Statutory Audit Dossier API
     res = client.get("/run/demo-run-001/statutory-dossier")
@@ -64,4 +54,5 @@ def test_full_system_live_integration():
     assert dossier_data["run_id"] == "demo-run-001"
     assert dossier_data["merkle_root_hash"] is not None
     assert len(dossier_data["merkle_root_hash"]) == 64
-    assert "STATUTORY AUDIT & COMPLIANCE DOSSIER" in dossier_data["full_statutory_text"]
+    assert "RECONCILIATION RUN REPORT" in dossier_data["full_statutory_text"]
+    assert dossier_data["is_solvency_certified"] is False

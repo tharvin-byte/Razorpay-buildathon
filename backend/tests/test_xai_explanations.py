@@ -1,11 +1,9 @@
 import sys
-import os
 
 # Ensure UTF-8 output
 sys.stdout.reconfigure(encoding='utf-8')
 
 from backend.engine.agents.discrepancy_agent import DiscrepancyDecompositionAgent
-from backend.models.schemas import DiscrepancyDetail
 
 def run_comprehensive_xai_test_suite():
     print("=" * 80)

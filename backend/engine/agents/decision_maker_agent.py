@@ -1,5 +1,4 @@
-from typing import Dict, Any, List, Optional, Tuple
-import numpy as np
+from typing import Dict, Any, List, Optional
 from backend.models.schemas import (
     ReconciliationResult, SignalBreakdown, DiscrepancyDetail,
     AgentTraceStep, BankRecord, LedgerRecord, SettlementRecord

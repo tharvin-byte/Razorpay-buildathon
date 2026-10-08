@@ -10,9 +10,7 @@ Tests:
 6. End-to-End Multi-Source Reconciliation Pipeline Integration
 """
 
-import pytest
 import numpy as np
-import pandas as pd
 from backend.engine.vector_tensor import HybridTensorEngine, sinkhorn_bipartite_match
 from backend.engine.graph_solver import BipartiteGraphSolver, TransactionLifecycleDAG
 from backend.engine.conformal_verifier import ConformalRiskVerifier, MerkleAuditTree
@@ -149,5 +147,6 @@ def test_end_to_end_orchestrator_run():
     summary = orchestrator.get_summary()
     assert summary.merkle_root_hash is not None
     assert len(summary.merkle_root_hash) == 64
-    assert summary.conformal_calibrated_threshold is not None
+    assert summary.conformal_calibrated_threshold is None
+    assert summary.empirical_selected_threshold is not None
     assert summary.match_rate > 0.60
