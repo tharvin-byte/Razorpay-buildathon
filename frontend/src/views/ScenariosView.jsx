@@ -158,175 +158,81 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
 
   const hasUnappliedChanges = Math.abs(threshold - appliedThreshold) > 0.005;
 
-  // ── Real Financial Numbers from live API ──────────────────────────────────
-  // totalVolume = sum of all bank transaction amounts from real data
-  const totalVolume = useMemo(() => {
-    if (transactions.length === 0) return 0;
-    return transactions.reduce((sum, t) => {
-      const amt = t.bank_record?.amount ?? t.matched_ledger_record?.gross_amount ?? 0;
-      return sum + Math.abs(amt);
-    }, 0);
-  }, [transactions]);
-
+  // Live financial aggregates computed from ingested transaction records
   const financialStats = useMemo(() => {
-    const s = liveSummary;
-    if (!s) return { unblockedRaw: 0, quarantinedRaw: 0, matchedRecords: 0, exceptionRecords: 0, totalRecords: 0, cleanRatePercent: 0 };
-
-    const totalRecords = s.total_bank_records || 0;
-    const matchedRecords = (s.matched_clean_count || 0) + (s.matched_discrepancy_count || 0);
-    const exceptionRecords = (s.exception_bank_count || 0) + (s.exception_ledger_count || 0);
-    const matchRate = s.match_rate || 0;
-
-    // Rupee split: matched transactions unblocked, exceptions quarantined
-    const unblockedAmt = Math.round(totalVolume * matchRate);
-    const quarantinedAmt = totalVolume - unblockedAmt;
-
+    const bankTx = transactions.filter((item) => item.bank_record);
+    const matchedTx = bankTx.filter((item) => ['matched_clean', 'matched_with_discrepancy'].includes(item.status));
+    const excTx = bankTx.filter((item) => item.status === 'exception');
     return {
-      unblockedRaw: unblockedAmt,
-      quarantinedRaw: quarantinedAmt,
-      matchedRecords,
-      exceptionRecords,
-      totalRecords,
-      cleanRatePercent: matchRate * 100
+      totalVolume: bankTx.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0),
+      unblockedRaw: matchedTx.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0),
+      quarantinedRaw: excTx.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0),
+      matchedRecords: matchedTx.length,
+      exceptionRecords: excTx.length,
+      totalRecords: bankTx.length,
+      cleanRatePercent: liveSummary?.bank_match_rate == null ? null : liveSummary.bank_match_rate * 100,
     };
-  }, [liveSummary, totalVolume]);
+  }, [transactions, liveSummary?.bank_match_rate]);
+  const totalVolume = financialStats.totalVolume;
 
   // Business Policy Insight
-  const policyInsight = useMemo(() => {
-    if (threshold >= 0.82) {
-      return {
-        title: 'Ultra-Conservative Statutory Mode',
-        color: '#8B5CF6',
-        border: 'rgba(139, 92, 246, 0.35)',
-        bg: 'rgba(139, 92, 246, 0.08)',
-        badge: 'Zero False-Positives Guaranteed',
-        desc: 'Zero duplicate or wrongful matches allowed. Guaranteed 100% statutory safety, with slightly higher exception volume held in suspense for manual sign-off.'
-      };
-    } else if (threshold <= 0.68) {
-      return {
-        title: 'High-Velocity Accelerated Mode',
-        color: '#818CF8',
-        border: 'rgba(99, 102, 241, 0.35)',
-        bg: 'rgba(99, 102, 241, 0.08)',
-        badge: 'Max Payout Velocity',
-        desc: 'Prioritizing merchant settlement velocity. Auto-settles 85%+ of transactions and absorbs minor rounding variances. Ideal for daily flash sales and high-inflow volume.'
-      };
-    } else {
-      return {
-        title: 'Optimal Conformal Operating Point (Stanford CRC Certified)',
-        color: '#34D399',
-        border: 'rgba(16, 185, 129, 0.35)',
-        bg: 'rgba(16, 185, 129, 0.08)',
-        badge: 'Stanford CRC Guaranteed α ≤ 0.001',
-        desc: 'Statistically calibrated point satisfying α ≤ 0.001 error bound. Delivers optimal 96.5% precision with 86.2% recall rate — minimal manual review with provable error bounds.'
-      };
-    }
-  }, [threshold]);
-
-  // ── Real Cluster Breakdown from discrepancy_breakdown map ─────────────────
-  // discrepancy_breakdown looks like: { "fee_variance": 14, "timing_lag": 10, ... }
-  const buildClusters = (s, permissive = false) => {
-    if (!s) return [];
-    const bd = s.discrepancy_breakdown || {};
-    const cleanCount = s.matched_clean_count || 0;
-    const discCount  = s.matched_discrepancy_count || 0;
-    const bankExc   = s.exception_bank_count || 0;
-    const ledgerExc = s.exception_ledger_count || 0;
-    const expected  = s.expected_non_match_count || 0;
-
-    // Map backend discrepancy keys to human-readable cluster labels
-    const discTypeMap = {
-      fee_variance:   { title: 'Payment Gateway Fee Variances (MDR)', status: permissive ? 'Auto-Post to ERP' : 'Auto-Voucher to ERP', score: 88, color: '#F59E0B' },
-      timing_lag:    { title: 'Settlement Batch Timing Lag (T+1/T+2)', status: 'Prioritize (Clean)', score: 92, color: '#34D399' },
-      duplicate:     { title: 'Same-Amount Duplicate Traps', status: 'Quarantine (Double Claim)', score: 28, color: '#FB7185' },
-      amount_mismatch: { title: 'Amount Mismatch Variances', status: permissive ? 'Auto-Rebalance' : 'Flag for Review', score: 62, color: '#F59E0B' },
-      missing_utr:   { title: 'Missing UTR Reference Entries', status: 'Flag for Review', score: 55, color: '#F59E0B' },
-    };
-
-    const clusters = [];
-
-    // Clean matches → UPI P2M cluster
-    if (cleanCount > 0) {
-      clusters.push({ title: 'UPI Instant P2M Settlements (Clean)', count: cleanCount, status: 'Prioritize (Clean)', score: 98, color: '#34D399' });
-    }
-    // Discrepancy sub-types from real breakdown
-    for (const [key, count] of Object.entries(bd)) {
-      if (count > 0) {
-        const meta = discTypeMap[key] || { title: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), status: 'Review', score: 60, color: '#F59E0B' };
-        clusters.push({ ...meta, count });
-      }
-    }
-    // If no breakdown keys, show total discrepancy count as one row
-    if (Object.keys(bd).length === 0 && discCount > 0) {
-      clusters.push({ title: 'Reconciled With Discrepancies', count: discCount, status: 'Auto-Voucher to ERP', score: 75, color: '#F59E0B' });
-    }
-    // Bank-side orphans → dispute claims
-    if (bankExc > 0) {
-      clusters.push({ title: 'Unrepresented Bank Credits (Orphans)', count: bankExc, status: 'Quarantine (Dispute Claim)', score: 35, color: '#FB7185' });
-    }
-    // Ledger-side orphans
-    if (ledgerExc > 0) {
-      clusters.push({ title: 'Ledger-Only Unmatched Entries', count: ledgerExc, status: 'Quarantine (Missing Payment)', score: 30, color: '#FB7185' });
-    }
-    // Expected non-matches (refunds, contra entries)
-    if (expected > 0) {
-      clusters.push({ title: 'Expected Non-Matches (Refunds/Contra)', count: expected, status: 'Prioritize (Resolved)', score: 91, color: '#34D399' });
-    }
-    return clusters;
+  const policyInsight = {
+    title: `Current acceptance threshold ${threshold.toFixed(2)}`,
+    color: '#818CF8',
+    border: 'rgba(99, 102, 241, 0.35)',
+    bg: 'rgba(99, 102, 241, 0.08)',
+    badge: 'Configured threshold',
+    desc: 'This is a score cutoff. Its effect on observed results depends on the current run and does not establish an error-rate guarantee.',
+  };
+  const buildClusters = (sourceSummary) => {
+    if (!sourceSummary) return [];
+    const entries = Object.entries(sourceSummary.discrepancy_breakdown || {})
+      .filter(([, count]) => count > 0)
+      .map(([key, count]) => ({
+        title: key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
+        count,
+        status: 'Review / investigate',
+        color: '#F59E0B',
+      }));
+    return entries;
   };
 
-  // Build two scenario snapshots from the live summary:
-  //   Scenario A = current run at λ=current_threshold (conservative/default)
-  //   Scenario B = projected at λ=0.65 (permissive) — re-scaled proportionally from sweep
   const presetScenarios = useMemo(() => {
-    const s = liveSummary;
-    const sweepAt65 = sweepPoints.find(p => Math.abs(p.threshold - 0.65) < 0.03);
-    const curMatchRate = s?.match_rate || 0;
-    const permMatchRate = sweepAt65?.match_rate ?? Math.min(0.95, curMatchRate + 0.12);
-    const permVol = Math.round(totalVolume * permMatchRate);
-    const curVol  = Math.round(totalVolume * curMatchRate);
-
-    // Build a fake permissive summary for cluster display (scaled counts)
-    const scaledPermSummary = s ? {
-      ...s,
-      matched_clean_count: Math.round((s.matched_clean_count || 0) * (permMatchRate / Math.max(curMatchRate, 0.01))),
-      matched_discrepancy_count: s.matched_discrepancy_count || 0,
-      exception_bank_count: Math.max(0, Math.round((s.exception_bank_count || 0) * 0.5)),
-      exception_ledger_count: Math.max(0, Math.round((s.exception_ledger_count || 0) * 0.5)),
-      match_rate: permMatchRate,
-      discrepancy_breakdown: s.discrepancy_breakdown || {}
-    } : null;
-
-    return [
-      {
-        id: 'conservative',
-        name: 'Scenario A: Conformal Risk Policy (Current Run)',
-        badge: 'Active Policy · λ=' + (s?.current_threshold?.toFixed(2) ?? '0.75'),
+    const active = liveSummary;
+    const at65 = sweepPoints.find((point) => Math.abs(point.threshold - 0.65) < 0.001);
+    const scenarios = [];
+    if (active) {
+      scenarios.push({
+        id: 'current',
+        name: 'Current run',
+        badge: `Observed at ${active.current_threshold.toFixed(2)}`,
         badgeColor: '#10B981',
-        description: `Strict statistical threshold (λ=${s?.current_threshold?.toFixed(2) ?? '0.75'}). Zero duplicate-claiming. All discrepancies auto-vouchered to ERP.`,
-        threshold: s?.current_threshold ?? 0.75,
-        tolerance: '±₹0.00 (Zero Tolerance)',
-        cleanRateRaw: curMatchRate * 100,
-        unblockedRaw: curVol,
-        quarantinedRaw: totalVolume - curVol,
-        clusters: buildClusters(s, false)
-      },
-      {
-        id: 'accelerated',
-        name: 'Scenario B: Accelerated Auto-Settlement (λ=0.65)',
-        badge: 'Permissive Mode · High Velocity',
+        description: 'Metrics and amounts calculated from this completed run.',
+        threshold: active.current_threshold,
+        tolerance: 'Not configured',
+        cleanRateRaw: active.bank_match_rate * 100,
+        unblockedRaw: financialStats.unblockedRaw,
+        quarantinedRaw: financialStats.quarantinedRaw,
+        clusters: buildClusters(active),
+      });
+    }
+    if (at65) {
+      scenarios.push({
+        id: 'threshold-065',
+        name: 'Threshold sweep at 0.65',
+        badge: 'Empirical benchmark point',
         badgeColor: '#818CF8',
-        description: 'Permissive threshold (λ=0.65). Auto-posts minor fee differences to variance accounts. Releases more capital with slightly higher risk tolerance.',
-        threshold: 0.65,
-        tolerance: '±₹15.00 Auto-Rebalance',
-        cleanRateRaw: permMatchRate * 100,
-        unblockedRaw: permVol,
-        quarantinedRaw: totalVolume - permVol,
-        clusters: buildClusters(scaledPermSummary, true)
-      }
-    ];
-  }, [liveSummary, sweepPoints, totalVolume]);
-
+        description: 'Observed labeled-run metrics at this threshold. The sweep does not include amounts or an independently recomputed summary.',
+        threshold: at65.threshold,
+        tolerance: 'Not configured',
+        cleanRateRaw: at65.bank_match_rate * 100,
+        unblockedRaw: null,
+        quarantinedRaw: null,
+        clusters: [],
+      });
+    }
+    return scenarios;
+  }, [liveSummary, sweepPoints, financialStats]);
   // Chart Geometry
   const svgWidth = 840;
   const svgHeight = 270;
@@ -348,35 +254,12 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
     return padTop + (1 - Math.max(0, Math.min(maxAmt, amt)) / maxAmt) * chartInnerHeight;
   };
 
-  const displayPoints = sweepPoints.length > 0 ? sweepPoints : [
-    { threshold: 0.55, precision: 0.88, recall: 0.98, f1_score: 0.93 },
-    { threshold: 0.60, precision: 0.90, recall: 0.95, f1_score: 0.92 },
-    { threshold: 0.65, precision: 0.92, recall: 0.92, f1_score: 0.92 },
-    { threshold: 0.70, precision: 0.94, recall: 0.89, f1_score: 0.91 },
-    { threshold: 0.75, precision: 0.965, recall: 0.862, f1_score: 0.91 },
-    { threshold: 0.80, precision: 0.98, recall: 0.80, f1_score: 0.88 },
-    { threshold: 0.85, precision: 0.99, recall: 0.72, f1_score: 0.83 },
-    { threshold: 0.90, precision: 1.00, recall: 0.61, f1_score: 0.76 }
-  ];
-
-  // Financial Curves
-  const unblockedPoly = displayPoints
-    .map((pt) => `${getSvgX(pt.threshold)},${getSvgYRupees(totalVolume * pt.recall)}`)
-    .join(' ');
-
-  const quarantinedPoly = displayPoints
-    .map((pt) => `${getSvgX(pt.threshold)},${getSvgYRupees(totalVolume * (1 - pt.recall))}`)
-    .join(' ');
-
-  // Precision / Recall Curves
-  const precisionPoly = displayPoints
-    .map((pt) => `${getSvgX(pt.threshold)},${getSvgYPct(pt.precision)}`)
-    .join(' ');
-
-  const recallPoly = displayPoints
-    .map((pt) => `${getSvgX(pt.threshold)},${getSvgYPct(pt.recall)}`)
-    .join(' ');
-
+  const displayPoints = sweepPoints;
+  // The sweep returns rates/counts, not currency totals, so no capital curve is inferred.
+  const unblockedPoly = '';
+  const quarantinedPoly = '';
+  const precisionPoly = displayPoints.filter((point) => point.precision_available).map((point) => `${getSvgX(point.threshold)},${getSvgYPct(point.precision)}`).join(' ');
+  const recallPoly = displayPoints.map((point) => `${getSvgX(point.threshold)},${getSvgYPct(point.recall)}`).join(' ');
   const activeX = Math.max(padLeft, Math.min(svgWidth - padRight, getSvgX(threshold)));
 
   return (
@@ -387,10 +270,10 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
         accentColor="#8B5CF6"
         badges={[
           { label: 'Policy & Sensitivity Studio', variant: 'clean' },
-          { label: 'Stanford CRC α ≤ 0.001 Certified', variant: 'expected' }
+          { label: 'Empirical run metrics', variant: 'expected' }
         ]}
         title="Reconciliation Policy & Sensitivity Studio"
-        description="Fine-tune mathematical decision cutoffs (λ), test standard compliance policies, and visualize capital disbursement velocity against audit risk in real time."
+        description="Fine-tune mathematical decision cutoffs (Î»), test standard compliance policies, and visualize capital disbursement velocity against audit risk in real time."
         rightSlot={
           <div
             style={{
@@ -610,15 +493,15 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                     >
                       <div>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                          Auto-Matched Rate
+                          Bank Match Rate
                         </div>
                         <div className="font-mono" style={{ fontSize: '20px', fontWeight: '800', color: '#34D399', marginTop: '2px' }}>
-                          <AnimatedPercent value={scen.cleanRateRaw} />
+                          {scen.cleanRateRaw == null ? 'Not available' : <AnimatedPercent value={scen.cleanRateRaw} />}
                         </div>
                       </div>
                       <div>
                         <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                          Threshold (λ)
+                          Threshold (Î»)
                         </div>
                         <div className="font-mono" style={{ fontSize: '20px', fontWeight: '800', color: '#8B5CF6', marginTop: '2px' }}>
                           {scen.threshold.toFixed(2)}
@@ -645,13 +528,13 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                         }}
                       >
                         <div style={{ fontSize: '10.5px', fontWeight: '700', color: '#6EE7B7', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <TrendingUp size={12} /> Unblocked Capital
+                          <TrendingUp size={12} /> Matched Bank Amount
                         </div>
                         <div className="font-mono" style={{ fontSize: '18px', fontWeight: '800', color: '#34D399', marginTop: '4px' }}>
-                          <AnimatedRupee value={scen.unblockedRaw} />
+                          {scen.unblockedRaw == null ? 'Not available' : <AnimatedRupee value={scen.unblockedRaw} />}
                         </div>
                         <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '2px' }}>
-                          Safe for instant disbursement
+                          Observed amount among matched bank records
                         </div>
                       </div>
 
@@ -664,13 +547,13 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                         }}
                       >
                         <div style={{ fontSize: '10.5px', fontWeight: '700', color: '#FDA4AF', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Lock size={12} /> Quarantined Escrow
+                          <Lock size={12} /> Exception Bank Amount
                         </div>
                         <div className="font-mono" style={{ fontSize: '18px', fontWeight: '800', color: '#FB7185', marginTop: '4px' }}>
-                          <AnimatedRupee value={scen.quarantinedRaw} />
+                          {scen.quarantinedRaw == null ? 'Not available' : <AnimatedRupee value={scen.quarantinedRaw} />}
                         </div>
                         <div style={{ fontSize: '10.5px', color: '#94A3B8', marginTop: '2px' }}>
-                          Held in suspense to prevent loss
+                          Observed amount among bank exceptions
                         </div>
                       </div>
                     </div>
@@ -682,6 +565,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {scen.clusters.length === 0 && <span style={{ color: 'var(--text-muted)' }}>No discrepancy breakdown available for this comparison.</span>}
                         {scen.clusters.map((cl, cIdx) => (
                           <div
                             key={cIdx}
@@ -724,7 +608,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                   {/* Footer Action Button with Motion Feedback */}
                   <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                      {scen.id === 'conservative' ? 'Recommended for Statutory & Big-4 Audits' : 'Recommended for Peak Sales & Flash Events'}
+                      {scen.id === 'current' ? 'Current run' : 'Sweep point'}
                     </span>
 
                     <motion.button
@@ -754,7 +638,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                         </>
                       ) : (
                         <>
-                          <span>Apply Policy Model (λ={scen.threshold})</span>
+                          <span>Apply Policy Model (Î»={scen.threshold})</span>
                           <ChevronRight size={14} />
                         </>
                       )}
@@ -789,7 +673,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '20px', marginBottom: '22px' }}>
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                    Acceptance Threshold Cutoff (λ)
+                    Acceptance Threshold Cutoff (Î»)
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '14px', marginTop: '4px' }}>
@@ -815,10 +699,10 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
 
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: '12.5px', color: '#34D399', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Sparkles size={13} /> Optimal CRC Target: 0.75
+                        <Sparkles size={13} /> Current threshold: {threshold.toFixed(2)}
                       </span>
                       <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                        Active Engine Cutoff: <strong>λ = {appliedThreshold.toFixed(2)}</strong>
+                        Active Engine Cutoff: <strong>Î» = {appliedThreshold.toFixed(2)}</strong>
                       </span>
                     </div>
                   </div>
@@ -856,7 +740,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                     ) : hasUnappliedChanges ? (
                       <>
                         <Zap size={15} />
-                        <span>Re-score Batch at λ = {threshold.toFixed(2)}</span>
+                        <span>Re-score Batch at Î» = {threshold.toFixed(2)}</span>
                       </>
                     ) : (
                       <>
@@ -868,13 +752,13 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
 
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {recomputing ? (
-                      <span style={{ color: '#FBBF24', fontWeight: '700' }}>⚡ Evaluating candidate scores against ground truth...</span>
+                      <span style={{ color: '#FBBF24', fontWeight: '700' }}>âš¡ Evaluating candidate scores against ground truth...</span>
                     ) : justApplied ? (
-                      <span style={{ color: '#34D399', fontWeight: '700' }}>✓ Batch re-scored in {lastRecomputeTime}ms · Updated</span>
+                      <span style={{ color: '#34D399', fontWeight: '700' }}>âœ“ Batch re-scored in {lastRecomputeTime}ms Â· Updated</span>
                     ) : hasUnappliedChanges ? (
-                      <span style={{ color: '#F59E0B', fontWeight: '600' }}>⚠ Threshold changed — click button to recompute</span>
+                      <span style={{ color: '#F59E0B', fontWeight: '600' }}>âš  Threshold changed â€” click button to recompute</span>
                     ) : (
-                      <span>● Engine idle and verified with Merkle root</span>
+                      <span>â— Engine idle and verified with Merkle root</span>
                     )}
                   </div>
                 </div>
@@ -900,7 +784,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
                   <span>0.50 (Permissive / High Velocity)</span>
-                  <span style={{ color: '#8B5CF6', fontWeight: '800' }}>0.75 (Recommended / Provable CRC Bound)</span>
+                  <span style={{ color: '#8B5CF6', fontWeight: '800' }}>Configured default: 0.75</span>
                   <span>0.95 (Ultra-Conservative / High Precision)</span>
                 </div>
 
@@ -908,8 +792,8 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                 <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
                   {[
                     { val: 0.65, label: '0.65 (High Velocity)' },
-                    { val: 0.75, label: '0.75 (CRC Optimal ★)' },
-                    { val: 0.85, label: '0.85 (Audit Safe)' }
+                    { val: 0.75, label: '0.75 (Default)' },
+                    { val: 0.85, label: '0.85' }
                   ].map((preset) => {
                     const isActive = Math.abs(threshold - preset.val) < 0.01;
                     return (
@@ -978,14 +862,14 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                 style={{ borderLeft: '3px solid #34D399', background: 'rgba(11, 17, 33, 0.85)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="metric-label">Auto-Match Clearance Rate</span>
+                  <span className="metric-label">Bank Match Rate</span>
                   <span style={{ fontSize: '10px', color: '#34D399', fontWeight: '700' }}>AUTOMATION</span>
                 </div>
                 <span className="metric-value font-mono" style={{ color: '#34D399' }}>
-                  <AnimatedPercent value={financialStats.cleanRatePercent} />
+                  {financialStats.cleanRatePercent == null ? 'Not available' : <AnimatedPercent value={financialStats.cleanRatePercent} />}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {financialStats.matchedRecords} of {financialStats.totalRecords} records auto-resolved
+                  {financialStats.matchedRecords} of {financialStats.totalRecords} bank records matched
                 </span>
               </motion.div>
 
@@ -995,14 +879,14 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                 style={{ borderLeft: '3px solid #8B5CF6', background: 'rgba(11, 17, 33, 0.85)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="metric-label">Unblocked Merchant Capital</span>
+                  <span className="metric-label">Matched Bank Amount</span>
                   <span style={{ fontSize: '10px', color: '#8B5CF6', fontWeight: '700' }}>LIQUIDITY</span>
                 </div>
                 <span className="metric-value font-mono" style={{ color: '#8B5CF6' }}>
                   <AnimatedRupee value={financialStats.unblockedRaw} />
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Safe for instant bank disbursement
+                  Observed amount among matched bank records
                 </span>
               </motion.div>
 
@@ -1012,14 +896,14 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                 style={{ borderLeft: '3px solid #FB7185', background: 'rgba(11, 17, 33, 0.85)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="metric-label">Quarantined Risk (Escrow)</span>
+                  <span className="metric-label">Exception Bank Amount</span>
                   <span style={{ fontSize: '10px', color: '#FB7185', fontWeight: '700' }}>EXPOSURE</span>
                 </div>
                 <span className="metric-value font-mono" style={{ color: '#FB7185' }}>
                   <AnimatedRupee value={financialStats.quarantinedRaw} />
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {financialStats.exceptionRecords} exceptions held in suspense
+                  {financialStats.exceptionRecords} bank-side exceptions
                 </span>
               </motion.div>
 
@@ -1029,14 +913,16 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                 style={{ borderLeft: '3px solid #A78BFA', background: 'rgba(11, 17, 33, 0.85)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="metric-label">Statutory Audit Safety</span>
-                  <span style={{ fontSize: '10px', color: '#A78BFA', fontWeight: '700' }}>COMPLIANCE</span>
+                  <span className="metric-label">Observed precision (labeled data)</span>
+                  <span style={{ fontSize: '10px', color: '#A78BFA', fontWeight: '700' }}>EVALUATION</span>
                 </div>
                 <span className="metric-value font-mono" style={{ color: '#A78BFA' }}>
-                  {currentMetrics?.precision ? `${(currentMetrics.precision * 100).toFixed(1)}%` : '96.5%'}
+                  {currentMetrics?.precision_available ? `${(currentMetrics.precision * 100).toFixed(1)}%` : 'Not available'}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                  {currentMetrics?.false_positives === 0 ? '✓ Zero False-Positive Traps' : `${currentMetrics?.false_positives ?? 0} False Positive Traps`}
+                  {currentMetrics?.precision_available
+              ? `${currentMetrics.correct_matches} / ${currentMetrics.predicted_match_count} predicted matches correct`
+              : 'No predicted matches to evaluate'}
                 </span>
               </motion.div>
             </div>
@@ -1055,13 +941,13 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#fff', margin: 0 }}>
                     {chartMode === 'financial'
-                      ? 'Capital Velocity vs. Quarantined Risk Sensitivity Curve'
-                      : 'Auditor Statistical Sensitivity Curve (Precision vs. Recall)'}
+                      ? 'Currency totals by threshold'
+                      : 'Observed precision and recall by threshold (Precision vs. Recall)'}
                   </h3>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
                     {chartMode === 'financial'
-                      ? 'Visualizes how tuning acceptance cutoff (λ) directly unblocks merchant cash flow versus holding risk in escrow.'
-                      : 'Auditor-certified statistical trade-off curve plotting Precision (Green) vs. Recall (Blue) across candidate thresholds.'}
+                      ? 'Visualizes how tuning acceptance cutoff (Î») directly unblocks merchant cash flow versus holding risk in escrow.'
+                      : 'Empirical precision and recall from the labeled threshold sweep for this run.'}
                   </p>
                 </div>
 
@@ -1081,7 +967,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    Treasury Cash Flow View (₹)
+                    Current run amounts (₹)
                   </button>
                   <button
                     onClick={() => setChartMode('auditor')}
@@ -1097,7 +983,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    Auditor Statistical View (%)
+                    Labeled sweep metrics (%)
                   </button>
                 </div>
               </div>
@@ -1107,7 +993,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                 {chartMode === 'financial' ? (
                   <>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8B5CF6' }}>
-                      <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px', boxShadow: '0 0 8px rgba(139, 92, 246, 0.5)' }} /> Unblocked Merchant Capital (₹)
+                      <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px', boxShadow: '0 0 8px rgba(139, 92, 246, 0.5)' }} /> Matched Bank Amount (₹)
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FB7185' }}>
                       <span style={{ width: '12px', height: '4px', background: '#FB7185', borderRadius: '2px', boxShadow: '0 0 8px rgba(251, 113, 133, 0.5)' }} /> Quarantined Risk in Escrow (₹)
@@ -1119,12 +1005,12 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                       <span style={{ width: '12px', height: '4px', background: '#34D399', borderRadius: '2px', boxShadow: '0 0 8px rgba(52, 211, 153, 0.5)' }} /> Precision Rate (Audit Rigor)
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8B5CF6' }}>
-                      <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px', boxShadow: '0 0 8px rgba(139, 92, 246, 0.5)' }} /> Recall Rate (Yield)
+                      <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px', boxShadow: '0 0 8px rgba(139, 92, 246, 0.5)' }} /> Observed recall
                     </span>
                   </>
                 )}
                 <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#F59E0B' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', boxShadow: '0 0 8px rgba(245, 158, 11, 0.6)' }} /> Active Cutoff (λ = {threshold.toFixed(2)})
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', boxShadow: '0 0 8px rgba(245, 158, 11, 0.6)' }} /> Active Cutoff (Î» = {threshold.toFixed(2)})
                 </span>
               </div>
 
@@ -1170,7 +1056,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                   {/* X-Axis Vertical Lines & Labels */}
                   {[0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90].map((t) => {
                     const x = getSvgX(t);
-                    const isOptimal = Math.abs(t - 0.75) < 0.001;
+                    const isOptimal = false;
                     return (
                       <g key={t}>
                         <line
@@ -1194,7 +1080,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                         </text>
                         {isOptimal && (
                           <text x={x} y={svgHeight - padBottom + 28} textAnchor="middle" fill="#34D399" fontSize="9.5px" fontWeight="700">
-                            ★ CRC Target
+                            â˜… Current threshold
                           </text>
                         )}
                       </g>
@@ -1203,10 +1089,13 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
 
                   {/* Polylines with Sleek Styling */}
                   {chartMode === 'financial' ? (
-                    <>
-                      <polyline fill="none" stroke="#8B5CF6" strokeWidth="3.5" points={unblockedPoly} strokeLinecap="round" strokeLinejoin="round" />
-                      <polyline fill="none" stroke="#FB7185" strokeWidth="3.5" points={quarantinedPoly} strokeLinecap="round" strokeLinejoin="round" />
-                    </>
+                    <text x={svgWidth / 2} y={svgHeight / 2} textAnchor="middle" fill="#94A3B8" fontSize="13px">
+                      Currency totals are not available for threshold sweep points.
+                    </text>
+                  ) : !displayPoints.length ? (
+                    <text x={svgWidth / 2} y={svgHeight / 2} textAnchor="middle" fill="#94A3B8" fontSize="13px">
+                      Labeled threshold sweep is not available for this run.
+                    </text>
                   ) : (
                     <>
                       <polyline fill="none" stroke="#34D399" strokeWidth="3.5" points={precisionPoly} strokeLinecap="round" strokeLinejoin="round" />
@@ -1229,7 +1118,7 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
                   <g transform={`translate(${activeX}, ${padTop - 12})`}>
                     <rect x="-34" y="-14" width="68" height="20" rx="4" fill="#F59E0B" />
                     <text x="0" y="0" textAnchor="middle" fill="#000" fontSize="10px" fontWeight="900" fontFamily="monospace">
-                      λ={threshold.toFixed(2)}
+                      Î»={threshold.toFixed(2)}
                     </text>
                   </g>
                 </svg>

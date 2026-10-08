@@ -1,101 +1,40 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Play, Database, CheckCircle2, FileText, Sparkles, Layers, Info, Cpu, Zap, Shield, GitBranch } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
+import { Play, Database, Sparkles, Cpu } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { api } from '../api';
 import PageHeader from '../components/PageHeader';
 
-function FileUploadCard({ icon: Icon, color, title, description, onFileChange, file }) {
-  const inputRef = useRef(null);
-  return (
-    <div
-      className="card"
-      onClick={() => inputRef.current?.click()}
-      style={{
-        borderStyle: 'dashed',
-        textAlign: 'center',
-        padding: '28px 20px',
-        cursor: 'pointer',
-        transition: 'border-color 0.2s ease, background 0.2s ease',
-        background: file ? `rgba(56, 189, 248, 0.06)` : 'var(--bg-card)',
-        borderColor: file ? color : 'var(--border-subtle)'
-      }}
-    >
-      {file ? (
-        <>
-          <CheckCircle2 size={28} color={color} style={{ margin: '0 auto 10px auto' }} />
-          <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#fff', marginBottom: '4px' }}>{title}</h3>
-          <p className="font-mono" style={{ fontSize: '11px', color, fontWeight: '700', wordBreak: 'break-all' }}>{file.name}</p>
-          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {(file.size / 1024).toFixed(1)} KB · Click to change
-          </p>
-        </>
-      ) : (
-        <>
-          <Icon size={30} color={color} style={{ margin: '0 auto 10px auto' }} />
-          <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#fff', marginBottom: '4px' }}>{title}</h3>
-          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.4' }}>{description}</p>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: 'var(--bg-input)', border: `1px solid ${color}40`,
-            padding: '6px 14px', borderRadius: 'var(--radius-full)',
-            fontSize: '12px', fontWeight: '600', color
-          }}>
-            <Upload size={12} /> Choose CSV File
-          </div>
-        </>
-      )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv"
-        style={{ display: 'none' }}
-        onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
-      />
-    </div>
-  );
-}
-
-export default function UploadRunView({ onRunComplete }) {
-  const [bankFile, setBankFile] = useState(null);
-  const [ledgerFile, setLedgerFile] = useState(null);
-  const [settlementFile, setSettlementFile] = useState(null);
+export default function UploadRunView({ onRunComplete, onToast }) {
   const [recordCount, setRecordCount] = useState(70);
   const [processing, setProcessing] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [runProgress, setRunProgress] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const pipelineSteps = [
-    { title: '1. Multi-Source Ingestion & Fast UTR Indexing', icon: Database, color: '#8B5CF6' },
-    { title: '2. 3D Multi-Signal Tensor & Sinkhorn Transport', icon: Zap, color: '#A78BFA' },
-    { title: '3. Bipartite Graph Partitioning & Netting', icon: Layers, color: '#C084FC' },
-    { title: '4. Stanford Conformal Risk & SHA-256 Merkle Tree', icon: Shield, color: '#10B981' },
-    { title: '5. Self-Healing ERP Vouchers & Dispute Drafting', icon: Sparkles, color: '#F59E0B' }
+    { title: 'Generate synthetic demo data', icon: Database, color: '#8B5CF6' },
+    { title: 'Run backend reconciliation', icon: Cpu, color: '#A78BFA' },
   ];
 
-  const handleRun = async (useSynthetic) => {
+  const handleRun = async () => {
     setProcessing(true);
+    setErrorMessage('');
     setActiveStep(0);
     try {
-      setRunProgress('Synthesizing realistic multi-source payment batch...');
+      setRunProgress('Generating synthetic demo data with seed 42...');
       setActiveStep(1);
 
       const uploadRes = await api.uploadOrGenerate({
-        bankFile: useSynthetic ? null : bankFile,
-        ledgerFile: useSynthetic ? null : ledgerFile,
-        settlementFile: useSynthetic ? null : settlementFile,
-        generateSynthetic: useSynthetic,
+        generateSynthetic: true,
         recordsCount: recordCount,
-        seed: Math.floor(Math.random() * 1000)
+        seed: 42
       });
 
       const runId = uploadRes.run_id;
       setActiveStep(2);
-      setRunProgress('Running 3D Tensor Core & Narration Parsing...');
+      setRunProgress('Running the backend reconciliation pipeline...');
 
       await api.startRun(runId, 0.75);
-
-      setActiveStep(3);
-      setRunProgress('Executing Graph Solver & Conformal Risk Verification...');
 
       let done = false;
       while (!done) {
@@ -103,8 +42,8 @@ export default function UploadRunView({ onRunComplete }) {
         const st = await api.getStatus(runId);
         if (st.status === 'completed') {
           done = true;
-          setActiveStep(4);
-          setRunProgress('Generating ERP Vouchers & Statutory Dossiers...');
+          setActiveStep(2);
+          setRunProgress('Reconciliation completed. Loading recorded results...');
           setTimeout(() => {
             onRunComplete(runId);
           }, 500);
@@ -118,7 +57,11 @@ export default function UploadRunView({ onRunComplete }) {
       }
     } catch (e) {
       console.error(e);
-      alert('Failed to execute reconciliation pipeline: ' + e.message);
+      const msg = e.message || 'Failed to execute reconciliation pipeline';
+      setErrorMessage(msg);
+      if (onToast) {
+        onToast({ title: 'Pipeline Execution Failed', message: msg, type: 'error' });
+      }
       setProcessing(false);
     }
   };
@@ -133,7 +76,7 @@ export default function UploadRunView({ onRunComplete }) {
           { label: 'Bank + Internal Ledger + Gateway Reports', variant: 'expected' }
         ]}
         title="Reconciliation Ingestion & Execution Engine"
-        description="Upload actual multi-source CSV files or trigger our high-fidelity synthetic generator replicating real-world Indian payment anomalies (MDR fees, GST splits, timing lags, and orphan deposits)."
+        description="Run a seeded synthetic demo through the backend reconciliation pipeline. CSV uploads are disabled until authenticated access is configured."
       />
 
       {/* Mode 1: 1-Click Synthetic Batch Generation */}
@@ -147,7 +90,7 @@ export default function UploadRunView({ onRunComplete }) {
               </h2>
             </div>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-              Generates a calibrated multi-source dataset containing exact UTR matches, messy UPI/NEFT narrations, contractual fee deductions, settlement batch delays (T+1/T+2), and intentional duplicate traps.
+              Generates a repeatable synthetic dataset for exercising the reconciliation workflow. This is demo data, not a production financial-data ingestion path.
             </p>
           </div>
 
@@ -171,13 +114,30 @@ export default function UploadRunView({ onRunComplete }) {
 
             <button
               className="btn-primary"
-              onClick={() => handleRun(true)}
+              onClick={handleRun}
               disabled={processing}
             >
               <Play size={14} /> Run Autonomous Engine
             </button>
           </div>
         </div>
+
+        {errorMessage && !processing && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 16px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: 'var(--radius-sm)',
+            color: '#F87171',
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>Failed: {errorMessage}</span>
+          </div>
+        )}
 
         {/* Pipeline Execution Stepper */}
         {processing && (
@@ -190,7 +150,7 @@ export default function UploadRunView({ onRunComplete }) {
               {runProgress}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
               {pipelineSteps.map((step, idx) => {
                 const Icon = step.icon;
                 const isCurrent = activeStep === idx;
@@ -220,60 +180,9 @@ export default function UploadRunView({ onRunComplete }) {
         )}
       </div>
 
-      {/* Mode 2: Custom Multi-Source CSV File Upload */}
-      <div style={{ marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '14px', fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '12px' }}>
-          Or Ingest Custom Financial CSV Statements:
-        </h2>
+      <div className="card" role="note" style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}>
+        CSV upload is unavailable until an authentication provider and authenticated access path are configured.
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        <FileUploadCard
-          icon={Database}
-          color="#8B5CF6"
-          title="Bank Nodal Account Statement"
-          description="CSV containing bank transaction IDs, amounts, value dates, and unstructured narration strings."
-          file={bankFile}
-          onFileChange={setBankFile}
-        />
-        <FileUploadCard
-          icon={FileText}
-          color="#A78BFA"
-          title="Internal Merchant ERP Ledger"
-          description="CSV containing invoice references, customer counterparty names, gross amounts, and fees."
-          file={ledgerFile}
-          onFileChange={setLedgerFile}
-        />
-        <FileUploadCard
-          icon={Layers}
-          color="#34D399"
-          title="Payment Gateway Settlement File (Optional)"
-          description="Settlement batch report containing interchange fees, GST splits, and UTR confirmations."
-          file={settlementFile}
-          onFileChange={setSettlementFile}
-        />
-      </div>
-
-      {/* Enable Reconcile button when ANY 2 or all 3 files are provided */}
-      {((bankFile && ledgerFile) || (bankFile && settlementFile) || (ledgerFile && settlementFile)) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(139, 92, 246, 0.1)', padding: '16px 20px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={16} color="#A78BFA" />
-            <span style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>
-              {bankFile && ledgerFile && settlementFile
-                ? 'Full 3-Way Triangulation Mode (Bank + Ledger + Gateway)'
-                : 'Bilateral 2-Way Reconciliation Mode (Any 2 Sources)'}
-            </span>
-          </div>
-          <button
-            className="btn-primary"
-            onClick={() => handleRun(false)}
-            disabled={processing}
-          >
-            <Play size={14} /> Reconcile Uploaded CSVs
-          </button>
-        </div>
-      )}
     </div>
   );
 }

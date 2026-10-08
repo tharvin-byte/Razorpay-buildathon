@@ -43,14 +43,14 @@ export default function AssistantChatView({ runId, onNavigateTab, onToast }) {
     return [
       {
         role: 'assistant',
-        text: `👋 **Hello! I am your ReconX AI Financial Controller & Treasury Copilot.**
+        text: `**ReconX run assistant**
 
-I am directly grounded in the live mathematical state of reconciliation run **\`${runId}\`**.
+I can summarize recorded results for run **\`${runId}\`** where that data is available.
 
 You can ask me to:
-- 🔍 **Inspect specific transactions** (e.g. *"Why was BNK-1066 quarantined?"*)
-- 📊 **Analyze variance & leakage** (e.g. *"What is our total MDR fee leakage?"*)
-- 🛠️ **Generate Tally XML vouchers** or **draft formal NPCI dispute notices**
+- **Inspect recorded transaction results** (e.g. *"Why was BNK-1066 quarantined?"*)
+- **Summarize recorded discrepancies**
+- **Explain the run digest and its limits**
 - 💡 Click any of the **Recommended Queries** on the left to start!`
       }
     ];
@@ -92,18 +92,18 @@ You can ask me to:
     },
     {
       icon: '📥',
-      label: 'Generate Tally XML Vouchers',
-      query: 'Generate double-entry Tally Prime XML vouchers for all reconciled fee variances in this run.'
+      label: 'Review unmatched records',
+      query: 'Summarize the unmatched records in this run and identify which recorded fields need review.'
     },
     {
       icon: '🎫',
-      label: 'Draft NPCI Bank Dispute',
-      query: 'Draft a formal NPCI statutory dispute notice for all bank orphan deposits in this run.'
+      label: 'Explain the run digest',
+      query: 'What does the SHA-256 digest for this run represent, and what does it not prove?'
     },
     {
       icon: '🛡️',
-      label: 'Explain Merkle & CRC Guarantee',
-      query: 'Explain the cryptographic SHA-256 Merkle root and Stanford Conformal Risk Control guarantee for this run.'
+      label: 'Summarize recorded discrepancies',
+      query: 'Summarize the discrepancy types and amounts recorded in this run.'
     },
     {
       icon: '💸',
@@ -148,7 +148,7 @@ You can ask me to:
     navigator.clipboard.writeText(text);
     setCopiedIdx(idx);
     if (onToast) {
-      onToast('Copied to clipboard', 'info');
+      onToast({ title: 'Copied', message: 'Copied to clipboard', type: 'info' });
     }
     setTimeout(() => setCopiedIdx(null), 2000);
   };
@@ -205,7 +205,7 @@ You can ask me to:
               }}
             >
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#34D399', boxShadow: '0 0 6px #34D399' }}></span>
-              Gemini 3.5 Live
+              Optional language model
             </span>
             <span className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
               {runId}
@@ -216,7 +216,7 @@ You can ask me to:
             Treasury Copilot Engine
           </h3>
           <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.45', marginBottom: '14px' }}>
-            Contextually bound to pipeline state, multi-source logs, and SHA-256 Merkle proofs.
+            Responses use the completed run summary and recorded reconciliation results.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -233,7 +233,7 @@ You can ask me to:
             >
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Reconciliation Rate</span>
               <span className="font-mono" style={{ fontSize: '12.5px', fontWeight: '800', color: '#A78BFA' }}>
-                {summaryData ? `${(summaryData.match_rate * 100).toFixed(1)}%` : '70.7%'}
+                {summaryData ? `${(summaryData.bank_match_rate * 100).toFixed(1)}%` : 'Not available'}
               </span>
             </div>
 
@@ -248,9 +248,9 @@ You can ask me to:
                 alignItems: 'center'
               }}
             >
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Precision Guarantee</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Observed precision (labeled run)</span>
               <span className="font-mono" style={{ fontSize: '12.5px', fontWeight: '800', color: '#34D399' }}>
-                96.5% (α ≤ 0.001)
+                {summaryData?.evaluation?.precision_available ? `${(summaryData.evaluation.precision * 100).toFixed(1)}% (${summaryData.evaluation.predicted_match_count} predicted)` : 'Not available'}
               </span>
             </div>
 
@@ -267,7 +267,7 @@ You can ask me to:
             >
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Quarantined Exceptions</span>
               <span className="font-mono" style={{ fontSize: '12.5px', fontWeight: '800', color: '#F87171' }}>
-                {summaryData ? `${summaryData.exception_bank_count + summaryData.exception_ledger_count} items` : '22 items'}
+                {summaryData ? `${summaryData.exception_bank_count + summaryData.exception_ledger_count} items` : 'Not available'}
               </span>
             </div>
           </div>
@@ -372,7 +372,7 @@ You can ask me to:
                 ReconX Autonomous Copilot
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>Strictly grounded in RBI Master Directions & Nodal Escrow state</span>
+                <span>Answers summarize run data where available</span>
               </div>
             </div>
           </div>
@@ -686,7 +686,7 @@ You can ask me to:
             }}
           >
             <Shield size={11} color="#A78BFA" />
-            <span>ReconX Copilot is mathematically grounded in run state • Conformal Risk α ≤ 0.001 Certified</span>
+            <span>Answers are based on available run data; verify financial decisions against source records.</span>
           </div>
         </div>
       </div>

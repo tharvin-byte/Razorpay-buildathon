@@ -58,9 +58,12 @@ export default function App() {
     }
   };
 
-  const addToast = (toast) => {
+  const addToast = (toast, toastType = 'info') => {
     const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { ...toast, id }]);
+    const toastObj = typeof toast === 'string'
+      ? { title: toastType === 'error' ? 'Error' : 'Notification', message: toast, type: toastType }
+      : { type: 'info', ...toast };
+    setToasts((prev) => [...prev, { ...toastObj, id }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
@@ -74,7 +77,7 @@ export default function App() {
     setRunId(newRunId);
     loadRunData(newRunId);
     setView('transactions');
-    addToast({ title: 'Reconciliation Complete', message: `Batch ${newRunId} reconciled and attested with SHA-256 Merkle root.` });
+    addToast({ title: 'Reconciliation Complete', message: `Run ${newRunId} completed. The result digest is available in the run report.` });
   };
 
   const handleApplyScenario = async (newThreshold) => {
@@ -84,7 +87,7 @@ export default function App() {
       setSummary(newSummary);
       addToast({
         title: 'Sensitivity Model Applied',
-        message: `Updated acceptance threshold to λ=${newThreshold}. Auto-approval rate: ${((newSummary.match_rate || 0) * 100).toFixed(1)}%`
+        message: `Threshold ${newThreshold.toFixed(2)} applied. Bank records matched: ${newSummary.bank_matched_records} / ${newSummary.total_bank_records} (${(newSummary.bank_match_rate * 100).toFixed(1)}%).`
       });
     } catch (e) {
       console.error(e);
@@ -106,18 +109,6 @@ export default function App() {
       sublabel: 'Dual-track regex + Gemini LLM — extracting names, invoice refs & rail codes',
       icon: Zap,
       color: '#C084FC'
-    },
-    {
-      label: 'ERP Self-Healing Agent',
-      sublabel: 'Synthesizing double-entry vouchers (Σ Debit = Σ Credit) for Tally & SAP',
-      icon: Sparkles,
-      color: '#10B981'
-    },
-    {
-      label: 'Bank Dispute Recovery Bot',
-      sublabel: 'Generating ISO 20022 & NPCI chargeback notices with SHA-256 Merkle leaf proofs',
-      icon: Shield,
-      color: '#F59E0B'
     },
   ];
 
@@ -149,18 +140,10 @@ export default function App() {
         }
       }
 
-      // Agent 3: ERP Self-Healing Agent
-      setBatchStep(3);
-      await new Promise((r) => setTimeout(r, 600));
-
-      // Agent 4: Bank Dispute Recovery Bot
-      setBatchStep(4);
-      await new Promise((r) => setTimeout(r, 600));
-
       setRunId(newRunId);
       await loadRunData(newRunId);
       setView('transactions');
-      addToast({ title: 'New Batch Ready', message: `Run ${newRunId} reconciled and sealed with SHA-256 Merkle root.` });
+      addToast({ title: 'New Demo Run Ready', message: `Run ${newRunId} completed. Review reconciliation results and exceptions.` });
     } catch (e) {
       console.error(e);
       addToast({ type: 'error', title: 'Batch Run Failed', message: e.message });
@@ -176,12 +159,12 @@ export default function App() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rbi_statutory_dossier_${runId}.txt`;
+      a.download = `reconciliation_run_report_${runId}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      addToast({ title: 'Dossier Downloaded', message: `Official RBI statutory compliance dossier exported for ${runId}` });
+      addToast({ title: 'Run Report Downloaded', message: `Reconciliation run report exported for ${runId}` });
     } catch (e) {
       console.error(e);
       addToast({ type: 'error', title: 'Export Failed', message: e.message });
@@ -388,7 +371,7 @@ export default function App() {
 
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', position: 'relative' }}>
           {currentView === 'upload' && (
-            <UploadRunView runId={runId} status={status} summary={summary} onRunComplete={handleRunComplete} setView={setView} />
+            <UploadRunView runId={runId} status={status} summary={summary} onRunComplete={handleRunComplete} setView={setView} onToast={addToast} />
           )}
           {currentView === 'sources' && (
             <DataSourcesView runId={runId} />

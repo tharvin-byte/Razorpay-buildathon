@@ -22,70 +22,45 @@ import PageHeader from '../components/PageHeader';
 
 const DEFAULT_RULES = [
   {
-    id: 'rule-01',
-    name: 'Auto-Approve Verified MDR Fee Gaps',
-    description: 'Auto-approve bank credit fee variances ≤ ₹20.00 when exact UTR matches internal ledger row.',
-    field: 'fee_deduction',
-    condition: 'delta_lte',
-    threshold: 20.0,
-    action: 'AUTO_APPROVE',
+    id: 'RULE-POL-001',
+    name: 'Automatic Paisa Rounding Tolerance (₹1.00)',
+    category: 'STATUTORY TOLERANCE',
+    description: 'Auto-absorbs fractional GST paisa rounding variances up to ₹1.00 directly into the Rounding Variance ledger (Account 4090).',
     active: true,
-    category: 'Fee Reconciliation',
-    impactAmount: 1420.50,
-    impactCount: 7
+    impact: '₹1.00 / txn limit',
   },
   {
-    id: 'rule-02',
-    name: 'Auto-Clear Standard T+1/T+2 Timing Cycles',
-    description: 'Auto-clear timing lag discrepancies if settlement date is within 48 hours of order creation.',
-    field: 'timing_lag',
-    condition: 'days_lte',
-    threshold: 2,
-    action: 'AUTO_CLEAR',
+    id: 'RULE-POL-002',
+    name: 'Clearinghouse T+2 Window Auto-Acceptance',
+    category: 'TIMING CYCLE',
+    description: 'Allows bank settlement receipts with 1-2 day clearinghouse cycle lag when payment gateway order reference matches.',
     active: true,
-    category: 'Settlement Cycles',
-    impactAmount: 8940.00,
-    impactCount: 4
+    impact: 'T+2 window allowed',
   },
   {
-    id: 'rule-03',
-    name: 'Paisa Rounding Variance Tolerance',
-    description: 'Auto-resolve micro-variances ≤ ₹0.50 caused by floating-point GST/MDR percentage truncation.',
-    field: 'rounding_difference',
-    condition: 'delta_lte',
-    threshold: 0.50,
-    action: 'AUTO_APPROVE',
+    id: 'RULE-POL-003',
+    name: 'High-Value Anomaly Quarantine (>₹50,000)',
+    category: 'FRAUD GUARD',
+    description: 'Quarantines un-attributed credits or ledger variances exceeding ₹50,000 for mandatory senior controller dual-approval.',
     active: true,
-    category: 'Rounding Tolerance',
-    impactAmount: 4.89,
-    impactCount: 5
+    impact: 'Dual-approval required',
   },
   {
-    id: 'rule-04',
-    name: 'Consolidated N:1 Batch Settlement Netting',
-    description: 'Auto-group multi-order lump payouts if sum of 2-3 ledger net amounts equals bank credit within ₹1.00.',
-    field: 'batch_settlement',
-    condition: 'net_zero_gap',
-    threshold: 1.0,
-    action: 'AUTO_RESOLVE_BATCH',
+    id: 'RULE-POL-004',
+    name: 'Case-Insensitive Reference Normalization',
+    category: 'INGESTION HYGIENE',
+    description: 'Automatically canonicalizes uppercase and lowercase invoice reference casing variations during candidate scoring.',
     active: true,
-    category: 'Batch Netting',
-    impactAmount: 14920.00,
-    impactCount: 2
+    impact: 'Case folding applied',
   },
   {
-    id: 'rule-05',
-    name: 'High-Value Ledger Orphan Escalation',
-    description: 'Immediately escalate uncollected ledger receivables > ₹5,000 to Senior Financial Controller.',
-    field: 'ledger_orphan',
-    condition: 'amount_gte',
-    threshold: 5000.0,
-    action: 'ESCALATE_CONTROLLER',
-    active: true,
-    category: 'Risk Escalation',
-    impactAmount: 26080.00,
-    impactCount: 3
-  }
+    id: 'RULE-POL-005',
+    name: 'Automated Sales Refund Clawback Offset',
+    category: 'REVERSAL POLICY',
+    description: 'Matches partial customer refund clawbacks against gross invoice amounts without flagging operational discrepancy.',
+    active: false,
+    impact: 'Sales Refunds A/C 5020',
+  },
 ];
 
 export default function RulesEngineView({ runId, setView }) {
@@ -129,9 +104,6 @@ export default function RulesEngineView({ runId, setView }) {
   };
 
   const activeRulesCount = rules.filter((r) => r.active).length;
-  const totalSimulatedSavings = rules
-    .filter((r) => r.active)
-    .reduce((acc, r) => acc + (r.impactAmount || 0), 0);
 
   return (
     <LayoutGroup id="rules-engine-group">
@@ -140,46 +112,46 @@ export default function RulesEngineView({ runId, setView }) {
           icon={Zap}
           accentColor="#8B5CF6"
           badges={[
-            { label: 'Autonomous Policy Engine', variant: 'clean' },
-            { label: 'Real-Time Simulation', variant: 'expected' },
+            { label: 'Policy configuration', variant: 'clean' },
+            { label: `${activeRulesCount} Active`, variant: 'expected' },
           ]}
-          title="Auto-Resolution Policy Engine"
-          description="Deterministic financial policies automatically resolve known timing lags, fee variances, and rounding deltas before triggering human audits."
+          title="Policy Rules & Guardrails"
+          description="Declarative business policy guardrails governing automated reconciliation, clearinghouse cycles, and statutory rounding tolerances."
         />
 
-        {/* 4-Column KPI Grid with Live Reactive Savings */}
+        {/* 4-Column KPI Grid */}
         <div className="kpi-grid" style={{ marginBottom: '24px' }}>
           <div className="kpi-card">
-            <div className="kpi-label">Active Policies</div>
+            <div className="kpi-label">Configured Policies</div>
             <div className="kpi-value font-mono" style={{ color: '#A78BFA' }}>
               {activeRulesCount} of {rules.length} Active
             </div>
-            <div className="kpi-subtext">Deterministic automation rules</div>
+            <div className="kpi-subtext">Active policy rules in engine</div>
           </div>
 
           <div className="kpi-card">
-            <div className="kpi-label">Auto-Resolved Capital</div>
+            <div className="kpi-label">Rounding Tolerance</div>
             <div className="kpi-value font-mono" style={{ color: '#34D399' }}>
-              ₹{totalSimulatedSavings.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              ₹1.00 / txn
             </div>
-            <div className="kpi-subtext">Zero manual touchpoints</div>
+            <div className="kpi-subtext">Statutory paisa auto-absorption ceiling</div>
           </div>
 
           <div className="kpi-card">
-            <div className="kpi-label">Audit Escalations Avoided</div>
+            <div className="kpi-label">Settlement Window</div>
             <div className="kpi-value font-mono" style={{ color: '#FBBF24' }}>
-              {rules.filter((r) => r.active).reduce((acc, r) => acc + (r.impactCount || 0), 0)} Gaps Auto-Healed
+              T+0 to T+2
             </div>
-            <div className="kpi-subtext">T+0 instant resolution</div>
+            <div className="kpi-subtext">Standard clearinghouse cycle allowance</div>
           </div>
 
           <div className="kpi-card">
             <div className="kpi-label">Policy Guardrail</div>
             <div className="kpi-value" style={{ color: '#34D399', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <CheckCircle2 size={16} />
-              <span>Immutable Ledger Guard</span>
+              <span>Enforced</span>
             </div>
-            <div className="kpi-subtext">Conformal Risk Bound α ≤ 0.001</div>
+            <div className="kpi-subtext">Statutory audit constraints active</div>
           </div>
         </div>
 
@@ -187,10 +159,10 @@ export default function RulesEngineView({ runId, setView }) {
         <div className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
           <div style={{ padding: '14px 18px', background: 'rgba(255, 255, 255, 0.015)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: '12px', fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Active Auto-Resolution Rules Registry
+              Configured Rules
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              Toggle switches to simulate instant balance impact
+              {activeRulesCount} of {rules.length} policies active
             </div>
           </div>
 
@@ -241,10 +213,10 @@ export default function RulesEngineView({ runId, setView }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexShrink: 0 }}>
                     <div style={{ textAlign: 'right' }}>
                       <div className="font-mono" style={{ fontSize: '13px', fontWeight: '700', color: rule.active ? '#34D399' : 'var(--text-muted)' }}>
-                        ₹{rule.impactAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {rule.impact}
                       </div>
                       <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                        {rule.impactCount} txns auto-healed
+                        {rule.active ? 'Policy active' : 'Policy disabled'}
                       </div>
                     </div>
 
