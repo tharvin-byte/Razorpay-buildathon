@@ -63,6 +63,7 @@ class DiscrepancyDetail(BaseModel):
         "reference_formatting",
         "duplicate_retry",
         "unreconciled_amount_gap",
+        "candidate_ambiguity",
         "status_mismatch",
         "none"
     ]
@@ -134,6 +135,11 @@ class EvaluationMetrics(BaseModel):
     f1_score: float
     false_positive_rate: float
     exception_accuracy: float
+    bank_record_count: int = 0
+    bank_matched_count: int = 0
+    predicted_match_count: int = 0
+    labeled_match_count: int = 0
+    precision_available: bool = False
     
     ground_truth_total_matches: int
     correct_matches: int
@@ -147,9 +153,13 @@ class ThresholdSweepPoint(BaseModel):
     recall: float
     f1_score: float
     match_rate: float
+    bank_match_rate: float = 0.0
     false_positive_rate: float
     matched_count: int
     exception_count: int
+    predicted_match_count: int = 0
+    labeled_match_count: int = 0
+    precision_available: bool = False
 
 class SummaryResponse(BaseModel):
     run_id: str
@@ -164,10 +174,20 @@ class SummaryResponse(BaseModel):
     expected_non_match_count: int
     
     match_rate: float
+    # Explicit-denominator metrics. `match_rate` is retained for API compatibility.
+    bank_match_rate: float = 0.0
+    ledger_coverage_rate: float = 0.0
+    overall_resolution_rate: float = 0.0
+    total_result_records: int = 0
+    bank_matched_records: int = 0
+    eligible_ledger_records: int = 0
+    matched_ledger_records: int = 0
+    resolved_result_records: int = 0
     discrepancy_breakdown: Dict[str, int]
     current_threshold: float
     merkle_root_hash: Optional[str] = None
     conformal_calibrated_threshold: Optional[float] = None
+    empirical_selected_threshold: Optional[float] = None
     evaluation: Optional[EvaluationMetrics] = None
 
 # ==========================================
@@ -190,10 +210,11 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     relevant_record_ids: List[str] = Field(default_factory=list)
-    confidence: float = 1.0
+    confidence: float = 0.0
+    confidence_available: bool = False
 
 class RecomputeRequest(BaseModel):
-    threshold: float
+    threshold: float = Field(ge=0.5, le=0.99)
 
 # ==========================================
 # Autonomous Action Suite Schemas
@@ -228,6 +249,7 @@ class ERPVoucherResponse(BaseModel):
     all_balanced: bool
     vouchers: List[ERPVoucher]
     tally_batch_xml: str
+    manual_review_items: List[Dict[str, Any]] = Field(default_factory=list)
 
 class DisputeClaim(BaseModel):
     claim_id: str
@@ -263,6 +285,8 @@ class StatutoryAuditDossier(BaseModel):
     total_exceptions: int
     merkle_root_hash: str
     is_solvency_certified: bool
-    form_3cb_schedule: Dict[str, Any]
+    form_3cb_schedule: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Statutory tax audit and operational reconciliation breakdown schedule"
+    )
     full_statutory_text: str
-

@@ -2,15 +2,11 @@
 Conformal Risk Control (CRC) & Merkle Audit Tree Engine
 ======================================================
 Implements:
-1. Conformal Risk Control (CRC) (Stanford / UC Berkeley - Angelopoulos et al., PNAS):
-   - Computes mathematically calibrated risk-bounded thresholds.
-   - Guarantees that the expected auto-resolution false-match rate is bounded by alpha (e.g. <= 0.1%).
-2. Merkle-Patricia Cryptographic Tree Attestation (IEEE S&P - Dagher et al.):
-   - Generates tamper-evident SHA-256 Merkle root hashes for continuous proof of escrow balance
-     without exposing customer PII.
+1. Empirical threshold selection from labeled observations.
+2. SHA-256 Merkle digest generation for result integrity checks.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import hashlib
 import json
 import numpy as np
@@ -18,8 +14,10 @@ import numpy as np
 
 class ConformalRiskVerifier:
     """
-    Implements Split Conformal Risk Control (CRC) for Auto-Resolution Rules.
-    Guarantees E[Loss(AutoResolved)] <= alpha with (1 - delta) statistical confidence.
+    Selects an empirical confidence threshold on labeled data.
+
+    This implementation does not provide a conformal finite-sample guarantee;
+    callers must describe its output as an empirical selection only.
     """
 
     def __init__(self, target_alpha: float = 0.001):
@@ -35,8 +33,9 @@ class ConformalRiskVerifier:
         default_fallback: float = 0.75
     ) -> float:
         """
-        Computes the empirical conformal threshold lambda_hat.
-        Matches with score >= lambda_hat satisfy the risk bound E[Loss] <= alpha.
+        Selects the highest-coverage observed score threshold meeting the
+        requested empirical false-positive fraction on the supplied labels.
+        This is not an independent or finite-sample risk guarantee.
         """
         if not calibration_confidence_scores or not ground_truth_labels:
             return default_fallback
@@ -60,7 +59,7 @@ class ConformalRiskVerifier:
 
             empirical_risk = false_positives / max(total_resolved, 1)
 
-            # Conformal finite-sample correction bound
+            # Empirical risk on the supplied sample only.
             if empirical_risk <= self.target_alpha:
                 return float(max(0.65, min(0.95, t)))
 
@@ -70,7 +69,7 @@ class ConformalRiskVerifier:
 class MerkleAuditTree:
     """
     Builds a Cryptographic SHA-256 Merkle Tree over reconciled transactions.
-    Provides Zero-Knowledge Proof of Escrow Solvency to regulators & auditors.
+    Provides tamper-evident cryptographic proof of reconciliation integrity to regulators & auditors.
     """
 
     @classmethod
@@ -88,6 +87,16 @@ class MerkleAuditTree:
             "utr": str(data_dict.get("utr", "")).strip().upper(),
             "status": str(data_dict.get("status", "")).upper()
         }
+        if "ledger_ids" in data_dict:
+            leaf_payload["ledger_ids"] = sorted(str(v) for v in data_dict.get("ledger_ids", []))
+        for key in ("confidence", "settlement_id", "settlement_amount", "gross_amount", "fee_amount", "refund_amount", "discrepancies"):
+            if key in data_dict:
+                value = data_dict[key]
+                if isinstance(value, float):
+                    value = round(value, 2) if key.endswith("amount") else round(value, 6)
+                if key == "discrepancies":
+                    value = sorted(value, key=lambda item: json.dumps(item, sort_keys=True))
+                leaf_payload[key] = value
         serialized = json.dumps(leaf_payload, sort_keys=True)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 

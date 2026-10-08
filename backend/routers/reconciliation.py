@@ -17,7 +17,9 @@ def get_transactions(
     run_id: str,
     status_filter: Optional[str] = Query(None),
     source_filter: Optional[str] = Query(None),
-    search: Optional[str] = Query(None)
+    search: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None, ge=1, le=10_000),
+    offset: int = Query(0, ge=0)
 ):
     session = get_session(run_id)
     if not session:
@@ -34,11 +36,18 @@ def get_transactions(
             r for r in res
             if s_clean in r.record_id.upper() or s_clean in r.explanation.upper()
         ]
+    if limit is not None:
+        return res[offset : offset + limit]
     return res
 
 
 @router.get("/run/{run_id}/discrepancies", response_model=List[ReconciliationResult])
-def get_discrepancies(run_id: str, disc_type: Optional[str] = Query(None)):
+def get_discrepancies(
+    run_id: str,
+    disc_type: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None, ge=1, le=10_000),
+    offset: int = Query(0, ge=0)
+):
     session = get_session(run_id)
     if not session:
         raise HTTPException(status_code=404, detail="Run session not found")
@@ -49,11 +58,18 @@ def get_discrepancies(run_id: str, disc_type: Optional[str] = Query(None)):
             r for r in disc_list
             if any(d.type == disc_type for d in r.discrepancies)
         ]
+    if limit is not None:
+        return disc_list[offset : offset + limit]
     return disc_list
 
 
 @router.get("/run/{run_id}/exceptions", response_model=List[ReconciliationResult])
-def get_exceptions(run_id: str, side: Optional[str] = Query(None)):
+def get_exceptions(
+    run_id: str,
+    side: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None, ge=1, le=10_000),
+    offset: int = Query(0, ge=0)
+):
     session = get_session(run_id)
     if not session:
         raise HTTPException(status_code=404, detail="Run session not found")
@@ -61,6 +77,8 @@ def get_exceptions(run_id: str, side: Optional[str] = Query(None)):
     exc_list = [r for r in session.results if r.status == "exception"]
     if side:
         exc_list = [r for r in exc_list if r.exception_side == side]
+    if limit is not None:
+        return exc_list[offset : offset + limit]
     return exc_list
 
 
@@ -134,7 +152,8 @@ def recompute_threshold(run_id: str, req: RecomputeRequest):
         return recompute_run(run_id=run_id, threshold=req.threshold)
     except RuntimeError as re:
         raise HTTPException(status_code=409, detail=str(re))
-    except Exception:
+    except Exception as e:
+        logger.exception("Threshold recompute failed for run_id=%s: %s", run_id, e)
         raise HTTPException(status_code=500, detail="Threshold recompute failed. Check server logs for details.")
 
 

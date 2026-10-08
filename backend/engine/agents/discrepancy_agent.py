@@ -1,8 +1,10 @@
-import os
+import logging
 import re
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from backend.models.schemas import DiscrepancyDetail
+
+logger = logging.getLogger("reconx.agents.discrepancy")
 
 class DiscrepancyDecompositionAgent:
     """
@@ -106,8 +108,8 @@ class DiscrepancyDecompositionAgent:
                             days_lag=days_lag
                         )
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed parsing clearinghouse settlement dates: %s", e)
                 
         # 4. Reference String Formatting Variation
         bank_narration = str(bank_record.get("narration", ""))
