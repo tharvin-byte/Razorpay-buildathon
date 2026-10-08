@@ -94,12 +94,16 @@ class EvaluationHarness:
         predicted_positives = correct_matches + false_positives
         actual_positives = gt_total_matches
         
-        precision = round(correct_matches / predicted_positives, 4) if predicted_positives > 0 else 1.0
-        recall = round(correct_matches / actual_positives, 4) if actual_positives > 0 else 1.0
+        precision = round(correct_matches / predicted_positives, 4) if predicted_positives > 0 else 0.0
+        recall = round(correct_matches / actual_positives, 4) if actual_positives > 0 else 0.0
         f1 = round(2 * (precision * recall) / (precision + recall), 4) if (precision + recall) > 0 else 0.0
         
         fp_rate = round(false_positives / (false_positives + correct_exceptions), 4) if (false_positives + correct_exceptions) > 0 else 0.0
         match_rate = round(matched_count / total, 4) if total > 0 else 0.0
+        bank_results = [r for r in results if r.source_type in ("bank", "batch")]
+        bank_matched = sum(
+            1 for r in bank_results if r.status in ("matched_clean", "matched_with_discrepancy")
+        )
         
         total_gt_orphans = sum(1 for g in ground_truth if g.get("is_orphan"))
         exception_acc = round(correct_exceptions / (total_gt_orphans + 1e-9), 4)
@@ -117,6 +121,11 @@ class EvaluationHarness:
             f1_score=f1,
             false_positive_rate=fp_rate,
             exception_accuracy=exception_acc,
+            bank_record_count=len(bank_results),
+            bank_matched_count=bank_matched,
+            predicted_match_count=predicted_positives,
+            labeled_match_count=actual_positives,
+            precision_available=predicted_positives > 0,
             ground_truth_total_matches=gt_total_matches,
             correct_matches=correct_matches,
             false_positives=false_positives,
@@ -138,40 +147,26 @@ class EvaluationHarness:
     ) -> List[ThresholdSweepPoint]:
         from backend.engine.orchestrator import ReconciliationOrchestrator
         
-        # 1. Obtain baseline results once
-        if base_results is None:
-            orch = ReconciliationOrchestrator(
-                bank_df=bank_df,
-                ledger_df=ledger_df,
-                settlement_df=settlement_df,
-                confidence_threshold=start
-            )
-            base_results = orch.run_pipeline()
-            
+        if step <= 0 or end < start:
+            raise ValueError("Threshold sweep requires step > 0 and end >= start")
+
         points: List[ThresholdSweepPoint] = []
         curr = start
         while curr <= end + 1e-5:
             thresh = round(curr, 2)
-            
-            # Fast vectorized threshold filtering in memory (<1ms)
-            thresholded_results = []
-            for r in base_results:
-                score = r.confidence_score or 0.0
-                if r.status in ["matched_clean", "matched_with_discrepancy"]:
-                    if score < thresh:
-                        # Drop below threshold into exception
-                        r_copy = r.model_copy(update={
-                            "status": "exception",
-                            "exception_side": "bank",
-                            "exception_reason": f"Confidence score {score*100:.1f}% below sweep threshold {thresh*100:.1f}%."
-                        })
-                        thresholded_results.append(r_copy)
-                    else:
-                        thresholded_results.append(r)
-                else:
-                    thresholded_results.append(r)
-                    
-            metrics = cls.evaluate(thresholded_results, ground_truth)
+
+            # Re-run the assignment at each threshold: changing the threshold
+            # can alter claims, batch choices, reverse-sweep rows and ambiguity.
+            orch = ReconciliationOrchestrator(
+                bank_df=bank_df,
+                ledger_df=ledger_df,
+                settlement_df=settlement_df,
+                confidence_threshold=thresh,
+                ground_truth=ground_truth
+            )
+            threshold_results = orch.run_pipeline()
+            metrics = cls.evaluate(threshold_results, ground_truth)
+            summary = orch.get_summary(run_id="threshold-sweep")
             
             points.append(
                 ThresholdSweepPoint(
@@ -180,9 +175,13 @@ class EvaluationHarness:
                     recall=metrics.recall,
                     f1_score=metrics.f1_score,
                     match_rate=metrics.match_rate,
+                    bank_match_rate=summary.bank_match_rate,
                     false_positive_rate=metrics.false_positive_rate,
                     matched_count=metrics.matched_count,
-                    exception_count=metrics.exception_count
+                    exception_count=metrics.exception_count,
+                    predicted_match_count=metrics.predicted_match_count,
+                    labeled_match_count=metrics.labeled_match_count,
+                    precision_available=metrics.precision_available
                 )
             )
             curr += step
@@ -192,12 +191,7 @@ class EvaluationHarness:
 
 class AuditDossierExporter:
     """
-    Statutory Big-4 & RBI Audit Exporter:
-    Compiles an official, cryptographically verifiable compliance dossier
-    adhering to:
-    - RBI Master Directions for Intermediary Nodal Accounts (Section 25 / 28)
-    - Indian Income Tax Act Form 3CB/CD Annexures for Financial Reconciliation
-    - Big-4 Statutory Audit Attestation Standards (SA 505 External Confirmations)
+    Builds a run report from reconciliation results and summary metrics.
     """
 
     @classmethod
@@ -207,81 +201,76 @@ class AuditDossierExporter:
         results: List[ReconciliationResult]
     ) -> StatutoryAuditDossier:
         now_str = datetime.now().strftime("%d-%B-%Y %H:%M:%S IST")
-        fy = f"FY {datetime.now().year}-{str(datetime.now().year + 1)[2:]}"
+        fy = "Not specified"
 
         total_volume = sum(
             float(r.bank_record.amount) for r in results if r.bank_record
         )
 
-        merkle_root = summary.merkle_root_hash or "7d4a7b06ebf2135370e55f09c09b7dbb04bdf548e46e9b9e5dd1de6f2621f6ea"
-        precision = summary.evaluation.precision if summary.evaluation else 1.0
-        is_solvency_certified = summary.match_rate >= 0.60 and precision >= 0.95
+        merkle_root = summary.merkle_root_hash or ""
+        precision = summary.evaluation.precision if summary.evaluation else 0.0
+        precision_available = bool(summary.evaluation and summary.evaluation.precision_available)
+        precision_label = f"{precision*100:.1f}%" if precision_available else "Not available"
+        is_solvency_certified = False
 
         schedule = {
             "TotalBankCredits": f"INR {total_volume:,.2f}",
             "VerifiedCleanMatches": summary.matched_clean_count,
             "MatchesWithVariance": summary.matched_discrepancy_count,
             "QuarantinedExceptions": summary.exception_bank_count + summary.exception_ledger_count,
-            "PrecisionScore": f"{precision*100:.1f}%",
-            "OverallMatchRate": f"{summary.match_rate*100:.1f}%",
+            "ObservedPrecision": precision_label,
+            "BankMatchRate": f"{summary.bank_match_rate*100:.1f}%",
             "MDRFeeLeakageVariance": summary.discrepancy_breakdown.get("fee_deduction", 0),
             "TimingLagsTPlus2": summary.discrepancy_breakdown.get("timing_lag", 0),
             "PartialRefundDeductions": summary.discrepancy_breakdown.get("partial_refund", 0)
         }
 
         full_text = f"""================================================================================
-                      STATUTORY AUDIT & COMPLIANCE DOSSIER
-     RECONCILIATION OF INTERMEDIARY NODAL / ESCROW ACCOUNTS (RBI COMPLIANT)
+                      RECONCILIATION RUN REPORT
 ================================================================================
 
-1. AUDIT ENGAGEMENT PARTICULARS:
-   - Audit Dossier ID          : STAT-AUD-{summary.run_id}
-   - Attestation Timestamp     : {now_str}
-   - Statutory Period          : {fy}
-   - Designated Nodal Account  : HDFC Bank Escrow Pool (A/C: 50200088219381)
-   - Governing Regulatory Body : Reserve Bank of India (DPSS Nodal Guidelines)
+1. RUN DETAILS:
+   - Run ID                    : {summary.run_id}
+   - Generated At              : {now_str}
+   - Reporting Period          : Not specified
+   - Account                   : Not provided by source data
 
 2. EXECUTIVE RECONCILIATION SUMMARY:
-   - Total Gross Bank Inflow   : INR {total_volume:,.2f}
-   - Bank Transactions Audited : {summary.total_bank_records}
+   - Total Bank Amount         : INR {total_volume:,.2f}
+   - Bank Records              : {summary.total_bank_records}
    - Internal Ledger Rows      : {summary.total_ledger_records}
-   - Clean Match Rate (No Gap) : {summary.match_rate*100:.1f}% ({summary.matched_clean_count} records)
+   - Bank Match Rate           : {summary.bank_match_rate*100:.1f}% ({summary.bank_matched_records} / {summary.total_bank_records} records)
    - Business Variance Matches : {summary.matched_discrepancy_count} records
-   - Quarantined Audit Orphans : {summary.exception_bank_count + summary.exception_ledger_count} records
+   - Exception Records         : {summary.exception_bank_count + summary.exception_ledger_count} records
 
-3. STATUTORY INVARIANT & ERROR BOUND ATTESTATION:
-   - Mathematical Precision    : {precision*100:.1f}% (Zero False Matches Detected)
-   - Conservation of Money     : Verified (|Sum(Bank) - Sum(Ledger)| <= INR 1.00)
-   - Conformal Risk Bound (CRC): Alpha <= 0.001 (99.9% Provable Statistical Safety)
-   - Escrow Solvency Status    : {'CERTIFIED SOLVENT & COMPLIANT' if is_solvency_certified else 'UNDER RECONCILIATION REVIEW'}
+3. OBSERVED RUN METRICS (NOT A STATUTORY CERTIFICATION):
+   - Observed Precision        : {precision_label}
+   - Bank Match Rate           : {summary.bank_match_rate*100:.1f}%
+   - Escrow Solvency Status    : Not assessed by this software
 
-4. DISCREPANCY & BUSINESS VARIANCE SCHEDULE (FORM 3CB/CD ANNEXURE):
+4. DISCREPANCY COUNTS:
    - Contractual MDR Fee Deductions : {summary.discrepancy_breakdown.get('fee_deduction', 0)} instances
    - Banking Settlement Timing Lags : {summary.discrepancy_breakdown.get('timing_lag', 0)} instances (T+1 to T+3)
    - Partial Customer Sales Returns : {summary.discrepancy_breakdown.get('partial_refund', 0)} instances
    - Paisa Rounding Differences     : {summary.discrepancy_breakdown.get('rounding_difference', 0)} instances
 
-5. CRYPTOGRAPHIC MERKLE TREE ATTESTATION ROOT:
-   Every individual transaction leaf in this audit run has been hashed with SHA-256 
-   and compounded into an immutable Merkle Tree Digest:
+5. SHA-256 RESULT DIGEST:
+   The result rows were hashed into a SHA-256 digest. This digest is not externally anchored:
    
    SHA-256 MERKLE ROOT:
    {merkle_root}
    
-   This cryptographic hash provides continuous, zero-knowledge mathematical proof 
-   that no ledger records or bank credits have been modified or deleted post-audit.
+   This digest alone does not prove that source data was complete or unchanged after export.
 
 ================================================================================
-Attested and Certified by:
-ReconX Autonomous Neuro-Symbolic Treasury Controller
-Statutory Audit Form 3CB/CD Appendix Reference: FY26-REC-001
+Generated by ReconX. This document is an operational report, not an auditor attestation.
 ================================================================================"""
 
         return StatutoryAuditDossier(
             run_id=summary.run_id,
             attestation_date=now_str,
             financial_year=fy,
-            nodal_escrow_account="HDFC Bank Escrow Pool (A/C: 50200088219381)",
+            nodal_escrow_account="Not provided by source data",
             total_settlement_volume=round(total_volume, 2),
             clean_match_rate=summary.match_rate,
             precision_rate=precision,

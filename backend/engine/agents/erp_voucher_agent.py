@@ -30,6 +30,8 @@ class ERPVoucherAgent:
         "suspense_clearing": {"code": "1099", "name": "Unreconciled Bank Suspense A/C"}
     }
 
+    APPROVED_ACCOUNTING_TYPES = {"partial_refund", "rounding_difference"}
+
     @classmethod
     def generate_vouchers_for_run(
         cls,
@@ -37,11 +39,24 @@ class ERPVoucherAgent:
         results: List[ReconciliationResult]
     ) -> ERPVoucherResponse:
         vouchers: List[ERPVoucher] = []
+        manual_review_items = []
         total_adjustable = 0.0
         vch_idx = 1000
 
         for r in results:
             if r.status == "matched_with_discrepancy" and r.discrepancies:
+                informational_types = {"timing_lag", "reference_formatting", "none"}
+                review_discrepancies = [
+                    d for d in r.discrepancies
+                    if d.type not in cls.APPROVED_ACCOUNTING_TYPES | informational_types
+                ]
+                if review_discrepancies:
+                    manual_review_items.append({
+                        "record_id": r.record_id,
+                        "discrepancy_types": sorted({d.type for d in review_discrepancies}),
+                        "reason": "Available source data does not establish the accounting treatment.",
+                    })
+                    continue
                 vch_idx += 1
                 vch = cls._build_discrepancy_voucher(vch_idx, r)
                 if vch:
@@ -49,14 +64,13 @@ class ERPVoucherAgent:
                     total_adjustable += vch.total_debit
 
             elif r.status == "exception" and r.source_type == "bank":
-                # Bank orphan -> Suspense Account Voucher
-                vch_idx += 1
-                vch = cls._build_orphan_suspense_voucher(vch_idx, r)
-                if vch:
-                    vouchers.append(vch)
-                    total_adjustable += vch.total_debit
+                manual_review_items.append({
+                    "record_id": r.record_id,
+                    "discrepancy_types": ["unattributed_bank_credit"],
+                    "reason": "Source data does not establish a ledger account or posting treatment.",
+                })
 
-        all_balanced = all(v.is_balanced for v in vouchers)
+        all_balanced = bool(vouchers) and all(v.is_balanced for v in vouchers)
         tally_batch_xml = cls._build_tally_batch_xml(run_id, vouchers)
 
         return ERPVoucherResponse(
@@ -65,7 +79,8 @@ class ERPVoucherAgent:
             total_adjustable_amount=round(total_adjustable, 2),
             all_balanced=all_balanced,
             vouchers=vouchers,
-            tally_batch_xml=tally_batch_xml
+            tally_batch_xml=tally_batch_xml,
+            manual_review_items=manual_review_items
         )
 
     @classmethod
@@ -84,7 +99,12 @@ class ERPVoucherAgent:
         vch_id = f"VCH-{formatted_date}-{idx:04d}"
         entries: List[ERPAccountEntry] = []
 
-        total_var = 0.0
+        bank_amt = float(bank.amount or 0.0)
+        gross_amt = float(ledger.gross_amount or 0.0)
+        fee = float(ledger.razorpay_fee or 0.0)
+        refund = float(ledger.refund_amount or 0.0)
+        expected_net = round(gross_amt - fee - refund, 2)
+        net_delta = round(bank_amt - expected_net, 2)
         reasons = []
 
         for d in result.discrepancies:
@@ -92,34 +112,7 @@ class ERPVoucherAgent:
             if amt <= 0.0:
                 continue
 
-            if d.type == "fee_deduction":
-                # 1.5% fee + 18% GST decomposition
-                base_fee = round(amt / 1.18, 2)
-                gst_fee = round(amt - base_fee, 2)
-
-                entries.append(
-                    ERPAccountEntry(
-                        account_code=cls.CHART_OF_ACCOUNTS["gateway_charges"]["code"],
-                        account_name=cls.CHART_OF_ACCOUNTS["gateway_charges"]["name"],
-                        debit_amount=base_fee,
-                        credit_amount=0.0,
-                        narration=f"MDR fee on {result.record_id} (Ref: {ledger.invoice_ref})"
-                    )
-                )
-                if gst_fee > 0:
-                    entries.append(
-                        ERPAccountEntry(
-                            account_code=cls.CHART_OF_ACCOUNTS["gst_input"]["code"],
-                            account_name=cls.CHART_OF_ACCOUNTS["gst_input"]["name"],
-                            debit_amount=gst_fee,
-                            credit_amount=0.0,
-                            narration=f"18% GST Input Credit on MDR Fee ({result.record_id})"
-                        )
-                    )
-                total_var += amt
-                reasons.append(f"MDR Fee (₹{amt:.2f})")
-
-            elif d.type == "partial_refund":
+            if d.type == "partial_refund":
                 entries.append(
                     ERPAccountEntry(
                         account_code=cls.CHART_OF_ACCOUNTS["sales_refunds"]["code"],
@@ -129,35 +122,60 @@ class ERPVoucherAgent:
                         narration=f"Partial customer refund deducted on {ledger.invoice_ref}"
                     )
                 )
-                total_var += amt
                 reasons.append(f"Partial Refund (₹{amt:.2f})")
 
             elif d.type == "rounding_difference":
-                entries.append(
-                    ERPAccountEntry(
-                        account_code=cls.CHART_OF_ACCOUNTS["rounding_variance"]["code"],
-                        account_name=cls.CHART_OF_ACCOUNTS["rounding_variance"]["name"],
-                        debit_amount=amt,
-                        credit_amount=0.0,
-                        narration=f"Paisa rounding adjustment on {result.record_id}"
+                if net_delta > 0.0:
+                    entries.append(
+                        ERPAccountEntry(
+                            account_code=cls.CHART_OF_ACCOUNTS["rounding_variance"]["code"],
+                            account_name=cls.CHART_OF_ACCOUNTS["rounding_variance"]["name"],
+                            debit_amount=0.0,
+                            credit_amount=amt,
+                            narration=f"Paisa rounding gain adjustment on {result.record_id}"
+                        )
                     )
-                )
-                total_var += amt
-                reasons.append(f"Rounding Variance (₹{amt:.2f})")
+                    reasons.append(f"Rounding Gain (+₹{amt:.2f})")
+                else:
+                    entries.append(
+                        ERPAccountEntry(
+                            account_code=cls.CHART_OF_ACCOUNTS["rounding_variance"]["code"],
+                            account_name=cls.CHART_OF_ACCOUNTS["rounding_variance"]["name"],
+                            debit_amount=amt,
+                            credit_amount=0.0,
+                            narration=f"Paisa rounding expense adjustment on {result.record_id}"
+                        )
+                    )
+                    reasons.append(f"Rounding Variance (₹{amt:.2f})")
 
-        if total_var <= 0.0:
+        if not entries:
             return None
 
-        # Balancing Credit Entry
-        entries.append(
-            ERPAccountEntry(
-                account_code=cls.CHART_OF_ACCOUNTS["settlement_control"]["code"],
-                account_name=cls.CHART_OF_ACCOUNTS["settlement_control"]["name"],
-                debit_amount=0.0,
-                credit_amount=round(total_var, 2),
-                narration=f"Net settlement credit clearance on {result.record_id}"
+        # Balancing Entry on Settlement Control Account
+        curr_deb = round(sum(e.debit_amount for e in entries), 2)
+        curr_cred = round(sum(e.credit_amount for e in entries), 2)
+        diff = round(curr_deb - curr_cred, 2)
+
+        if diff > 0.0:
+            entries.append(
+                ERPAccountEntry(
+                    account_code=cls.CHART_OF_ACCOUNTS["settlement_control"]["code"],
+                    account_name=cls.CHART_OF_ACCOUNTS["settlement_control"]["name"],
+                    debit_amount=0.0,
+                    credit_amount=diff,
+                    narration=f"Net settlement credit clearance on {result.record_id}"
+                )
             )
-        )
+        elif diff < 0.0:
+            entries.append(
+                ERPAccountEntry(
+                    account_code=cls.CHART_OF_ACCOUNTS["settlement_control"]["code"],
+                    account_name=cls.CHART_OF_ACCOUNTS["settlement_control"]["name"],
+                    debit_amount=abs(diff),
+                    credit_amount=0.0,
+                    narration=f"Net settlement debit clearance on {result.record_id}"
+                )
+            )
 
         total_deb = round(sum(e.debit_amount for e in entries), 2)
         total_cred = round(sum(e.credit_amount for e in entries), 2)

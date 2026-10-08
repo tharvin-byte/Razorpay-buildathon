@@ -174,9 +174,11 @@ class ScoringTool:
         try:
             d_bank = datetime.strptime(s_bank[:10], "%Y-%m-%d")
             d_ledger = datetime.strptime(s_ledger[:10], "%Y-%m-%d")
-            days_diff = abs((d_bank - d_ledger).days)
+            days_diff = (d_bank - d_ledger).days
             
-            if days_diff == 0:
+            if days_diff < 0:
+                return 0.0, f"Bank transaction precedes ledger date by {abs(days_diff)} days"
+            elif days_diff == 0:
                 return 1.0, "Same day settlement (T+0)"
             elif days_diff == 1:
                 return 0.85, "T+1 settlement lag (1 day)"
@@ -237,7 +239,13 @@ class ScoringTool:
         )
         
         # Normalize / round to 4 decimals
-        total_score = round(min(1.0, max(0.0, total)), 4)
+        # When UTR is absent, compare evidence on the remaining available
+        # channels rather than making a narration-resolved match impossible
+        # by construction. The decision maker applies an additional evidence
+        # gate before accepting these normalized scores.
+        has_utr = bool(clean_str(bank_utr) and clean_str(ledger_utr))
+        denominator = 1.0 if has_utr else (1.0 - cls.WEIGHT_UTR)
+        total_score = round(min(1.0, max(0.0, total / denominator)), 4)
         
         return {
             "total_score": total_score,
