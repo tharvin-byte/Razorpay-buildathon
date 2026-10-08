@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Sliders,
   CheckCircle2,
@@ -80,7 +80,7 @@ function AnimatedPercent({ value, decimals = 1 }) {
   return <span>{displayValue.toFixed(decimals)}%</span>;
 }
 
-export default function ScenariosView({ runId, summary, onApplyScenario, onToast }) {
+export default function ScenariosView({ runId, onApplyScenario, onToast }) {
   // Mode switcher: 'comparison' (A vs B Side-by-Side) or 'studio' (Interactive Sensitivity Studio & Curve)
   const [activeTab, setActiveTab] = useState('comparison');
   const [selectedPresetId, setSelectedPresetId] = useState('conservative');
@@ -94,15 +94,8 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
   const [lastRecomputeTime, setLastRecomputeTime] = useState(null);
   const [chartMode, setChartMode] = useState('financial'); // 'financial' (₹ Cash) or 'auditor' (% ML)
   const [justApplied, setJustApplied] = useState(false);
-  const [hoveredPoint, setHoveredPoint] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadStudioData();
-  }, [runId]);
-
-  const loadStudioData = async () => {
-    setLoading(true);
+  const loadStudioData = useCallback(async () => {
     try {
       const [sweepData, sum, txns] = await Promise.all([
         api.getThresholdSweep(runId).catch(() => []),
@@ -124,18 +117,20 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
       }
     } catch (e) {
       console.error('Failed to load studio data:', e);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [runId]);
+
+  useEffect(() => {
+    loadStudioData();
+  }, [loadStudioData]);
 
   const handleRecompute = async (targetThreshold) => {
     setRecomputing(true);
     setJustApplied(false);
-    const startT = performance.now();
+    const startT = Date.now();
     try {
       const res = await api.recomputeThreshold(runId, targetThreshold);
-      const elapsed = Math.round(performance.now() - startT);
+      const elapsed = Date.now() - startT;
       setLastRecomputeTime(elapsed);
       setAppliedThreshold(targetThreshold);
       setJustApplied(true);
@@ -147,10 +142,16 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
       if (onApplyScenario) {
         onApplyScenario(targetThreshold);
       }
+      if (onToast) {
+        onToast({ title: 'Sensitivity Applied', message: `Acceptance threshold ${targetThreshold.toFixed(2)} applied in ${elapsed}ms`, type: 'info' });
+      }
 
       setTimeout(() => setJustApplied(false), 3200);
     } catch (e) {
       console.error('Failed to recompute batch sensitivity:', e);
+      if (onToast) {
+        onToast({ title: 'Recompute Failed', message: e.message || 'Failed to recompute threshold', type: 'error' });
+      }
     } finally {
       setRecomputing(false);
     }
@@ -256,8 +257,6 @@ export default function ScenariosView({ runId, summary, onApplyScenario, onToast
 
   const displayPoints = sweepPoints;
   // The sweep returns rates/counts, not currency totals, so no capital curve is inferred.
-  const unblockedPoly = '';
-  const quarantinedPoly = '';
   const precisionPoly = displayPoints.filter((point) => point.precision_available).map((point) => `${getSvgX(point.threshold)},${getSvgYPct(point.precision)}`).join(' ');
   const recallPoly = displayPoints.map((point) => `${getSvgX(point.threshold)},${getSvgYPct(point.recall)}`).join(' ');
   const activeX = Math.max(padLeft, Math.min(svgWidth - padRight, getSvgX(threshold)));
