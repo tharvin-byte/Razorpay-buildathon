@@ -3,7 +3,7 @@ import re
 import json
 from typing import List, Dict, Any, Tuple, Optional
 from backend.models.schemas import ReconciliationResult, SummaryResponse
-from backend.engine.llm_gateway import get_gemini_client
+from backend.engine.llm_gateway import get_gemini_client, generate_content
 
 class ReconciliationAssistant:
     """
@@ -156,21 +156,21 @@ class ReconciliationAssistant:
         diff_lines = []
         for item in analytics["top_diff_txns"][:5]:
             diff_lines.append(
-                f"  * Txn: {item['id']} | Difference Gap: â‚¹{item['diff']:,.2f} | Customer: {item['customer']} | "
-                f"Bank Received: â‚¹{item['bank_amount']:,.2f} vs Expected: â‚¹{item['expected_net']:,.2f} | "
+                f"  * Txn: {item['id']} | Difference Gap: ₹{item['diff']:,.2f} | Customer: {item['customer']} | "
+                f"Bank Received: ₹{item['bank_amount']:,.2f} vs Expected: ₹{item['expected_net']:,.2f} | "
                 f"Reasons: {'; '.join(item['discrepancies'])}"
             )
 
         top_bank_lines = [
-            f"  * {b['id']}: â‚¹{b['amount']:,.2f} ({b['customer']})"
+            f"  * {b['id']}: ₹{b['amount']:,.2f} ({b['customer']})"
             for b in analytics["top_bank_txns"][:3]
         ]
         top_orphan_lines = [
-            f"  * Bank Orphan {bo['id']}: â‚¹{bo['amount']:,.2f} (Narration: {bo['narration'][:35]})"
+            f"  * Bank Orphan {bo['id']}: ₹{bo['amount']:,.2f} (Narration: {bo['narration'][:35]})"
             for bo in analytics["top_bank_orphans"][:3]
         ]
         top_missing_settlement_lines = [
-            f"  * Missing Settlement {lo['id']}: â‚¹{lo['gross']:,.2f} (Customer: {lo['customer']}, Invoice: {lo['invoice']})"
+            f"  * Missing Settlement {lo['id']}: ₹{lo['gross']:,.2f} (Customer: {lo['customer']}, Invoice: {lo['invoice']})"
             for lo in analytics["top_ledger_orphans"][:3]
         ]
 
@@ -236,9 +236,9 @@ KEY FINANCIAL RANKINGS & ANOMALY ANALYSIS:
                     counts[discrepancy.type] = counts.get(discrepancy.type, 0) + 1
                     totals[discrepancy.type] = totals.get(discrepancy.type, 0.0) + abs(float(discrepancy.impact_amount or 0.0))
             rows = [
-                f"| {kind.replace('_', ' ').title()} | {counts[kind]} | â‚¹{totals[kind]:,.2f} |"
+                f"| {kind.replace('_', ' ').title()} | {counts[kind]} | ₹{totals[kind]:,.2f} |"
                 for kind in sorted(counts)
-            ] or ["| None recorded | 0 | â‚¹0.00 |"]
+            ] or ["| None recorded | 0 | ₹0.00 |"]
             return (
                 f"Discrepancies in run `{summary.run_id}` (impact amounts are summed from recorded results):\n\n"
                 "| Type | Records | Recorded impact |\n|---|---:|---:|\n" + "\n".join(rows)
@@ -259,11 +259,11 @@ KEY FINANCIAL RANKINGS & ANOMALY ANALYSIS:
         if any(word in q_lower for word in ("cfo", "urgent", "investigate first", "priority")):
             priorities = []
             for item in analytics["top_diff_txns"][:3]:
-                priorities.append(f"- Variance `{item['id']}`: â‚¹{item['diff']:,.2f} ({item['customer']})")
+                priorities.append(f"- Variance `{item['id']}`: ₹{item['diff']:,.2f} ({item['customer']})")
             for item in analytics["top_bank_orphans"][:2]:
-                priorities.append(f"- Unmatched bank credit `{item['id']}`: â‚¹{item['amount']:,.2f}")
+                priorities.append(f"- Unmatched bank credit `{item['id']}`: ₹{item['amount']:,.2f}")
             for item in analytics["top_ledger_orphans"][:2]:
-                priorities.append(f"- Unmatched ledger entry `{item['id']}`: â‚¹{item['gross']:,.2f}")
+                priorities.append(f"- Unmatched ledger entry `{item['id']}`: ₹{item['gross']:,.2f}")
             return "Current run priorities:\n\n" + ("\n".join(priorities) or "- No ranked exceptions or variances in this run."), []
 
         if any(word in q_lower for word in ("tally", "xml", "journal voucher", "erp")):
@@ -277,7 +277,7 @@ KEY FINANCIAL RANKINGS & ANOMALY ANALYSIS:
             ledger_exceptions = [r for r in results if r.status == "exception" and r.source_type == "ledger"]
             exposure = sum(float(r.bank_record.amount) for r in bank_exceptions if r.bank_record)
             return (
-                f"Run `{summary.run_id}` contains {len(bank_exceptions)} bank exceptions totaling â‚¹{exposure:,.2f} "
+                f"Run `{summary.run_id}` contains {len(bank_exceptions)} bank exceptions totaling ₹{exposure:,.2f} "
                 f"and {len(ledger_exceptions)} ledger exceptions. Draft claim data, where available, is exposed at "
                 f"`/run/{summary.run_id}/disputes`; review supporting records and applicable rules before filing."
             ), [r.record_id for r in bank_exceptions[:5]]
@@ -299,26 +299,11 @@ CRITICAL INSTRUCTIONS:
 Context for Run {summary.run_id}:
 {context}"""
 
-            for model_name in [
-                'gemini-2.5-flash',
-                'gemini-2.0-flash',
-                'gemini-1.5-flash',
-                'gemini-flash-latest',
-            ]:
-                try:
-                    response = self.client.models.generate_content(
-                        model=model_name,
-                        contents=f"{system_prompt}\n\nUser Question: {q_clean}"
-                    )
-                    answer_text = response.text.strip()
-                    relevant_ids = [r.record_id for r in results if r.record_id in answer_text]
-                    print(f"[ReconX AI] âœ… Answered via {model_name}")
-                    return answer_text, relevant_ids[:5]
-                except Exception as e:
-                    print(f"[ReconX AI] âš ï¸ Model {model_name} failed: {type(e).__name__}: {e}")
-                    continue
+            answer_text = generate_content(f"{system_prompt}\n\nUser Question: {q_clean}")
+            if answer_text:
+                relevant_ids = [r.record_id for r in results if r.record_id in answer_text]
+                return answer_text.strip(), relevant_ids[:5]
 
-        # -----------------------------------------------------------------
         # 2. Native Computational Financial Intelligence Engine (Fallback)
         # -----------------------------------------------------------------
         
@@ -331,7 +316,7 @@ Context for Run {summary.run_id}:
                     amt = r.bank_record.amount if r.bank_record else (r.matched_ledger_record.gross_amount if r.matched_ledger_record else 0.0)
                     discs = [d.description for d in r.discrepancies] if r.discrepancies else ([r.exception_reason] if r.exception_reason else ["Clean Parity Match"])
                     status_badge = f"`{r.status.upper()}`"
-                    rows.append(f"| `{r.record_id}` | **â‚¹{amt:,.2f}** | {status_badge} | {'; '.join(discs)} |")
+                    rows.append(f"| `{r.record_id}` | **₹{amt:,.2f}** | {status_badge} | {'; '.join(discs)} |")
                 
                 table_md = "\n".join(rows)
                 
@@ -352,20 +337,20 @@ Context for Run {summary.run_id}:
                 top = top_diffs[0]
                 other_rows = []
                 for idx, t in enumerate(top_diffs[1:4], 2):
-                    other_rows.append(f"| **#{idx}** | `{t['id']}` | **â‚¹{t['diff']:,.2f}** | {t['customer']} | {t['discrepancies'][0] if t['discrepancies'] else 'Variance'} |")
+                    other_rows.append(f"| **#{idx}** | `{t['id']}` | **₹{t['diff']:,.2f}** | {t['customer']} | {t['discrepancies'][0] if t['discrepancies'] else 'Variance'} |")
                 
                 table_md = "\n".join(other_rows)
                 
                 return (
                     f"### ðŸ” Transaction with the Largest Amount Difference\n\n"
-                    f"The transaction with the largest variance in this batch is **`{top['id']}`** with an amount difference of **â‚¹{top['diff']:,.2f}**.\n\n"
+                    f"The transaction with the largest variance in this batch is **`{top['id']}`** with an amount difference of **₹{top['diff']:,.2f}**.\n\n"
                     f"| Detail | Value |\n"
                     f"| :--- | :--- |\n"
                     f"| **Bank Transaction ID** | `{top['id']}` |\n"
                     f"| **Customer / Counterparty** | **{top['customer']}** |\n"
-                    f"| **Bank Credit Received** | **â‚¹{top['bank_amount']:,.2f}** |\n"
-                    f"| **Expected Net Order Amount** | **â‚¹{top['expected_net']:,.2f}** (Gross: â‚¹{top['gross_amount']:,.2f}) |\n"
-                    f"| **Net Variance Gap** | <span style=\"color: #F87171; font-weight: 800;\">â‚¹{top['diff']:,.2f}</span> |\n"
+                    f"| **Bank Credit Received** | **₹{top['bank_amount']:,.2f}** |\n"
+                    f"| **Expected Net Order Amount** | **₹{top['expected_net']:,.2f}** (Gross: ₹{top['gross_amount']:,.2f}) |\n"
+                    f"| **Net Variance Gap** | <span style=\"color: #F87171; font-weight: 800;\">₹{top['diff']:,.2f}</span> |\n"
                     f"| **UTR Reference** | `{top['utr'] or 'Pending'}` |\n\n"
                     f"#### ðŸ’¡ Root Cause & Analysis\n"
                     f"{top['explanation'] or '; '.join(top['discrepancies'])}\n\n"

@@ -28,9 +28,11 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
   const [appliedThreshold, setAppliedThreshold] = useState(0.75);
   const [sweepPoints, setSweepPoints] = useState([]);
   const [currentMetrics, setCurrentMetrics] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [transactions, setTransactions] = useState([]);
   const [recomputing, setRecomputing] = useState(false);
   const [lastRecomputeTime, setLastRecomputeTime] = useState(null);
-  const [chartMode, setChartMode] = useState('financial'); // 'financial' (Capital vs Risk) or 'auditor' (Precision vs Recall)
+  const [chartMode, setChartMode] = useState('auditor'); // empirical precision/recall only when labeled sweep data exists
   const [justApplied, setJustApplied] = useState(false);
 
   useEffect(() => {
@@ -39,17 +41,16 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
 
   const loadSweepData = async () => {
     try {
-      const [sweepData, sum] = await Promise.all([
-        api.getThresholdSweep(runId),
-        api.getSummary(runId)
+      const [sweepData, sum, txnData] = await Promise.all([
+        api.getThresholdSweep(runId).catch(() => []),
+        api.getSummary(runId),
+        api.getTransactions(runId).catch(() => []),
       ]);
-
       const points = Array.isArray(sweepData) ? sweepData : (sweepData.points || []);
       setSweepPoints(points);
-
-      if (sum.evaluation) {
-        setCurrentMetrics(sum.evaluation);
-      }
+      setSummary(sum);
+      setTransactions(txnData);
+      setCurrentMetrics(sum.evaluation || null);
       if (sum.current_threshold) {
         setThreshold(sum.current_threshold);
         setAppliedThreshold(sum.current_threshold);
@@ -73,6 +74,8 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
       if (res.evaluation) {
         setCurrentMetrics(res.evaluation);
       }
+      setSummary(res);
+      try { setTransactions(await api.getTransactions(runId)); } catch { /* Keep the last fully loaded rows. */ }
       if (onThresholdChange) {
         onThresholdChange(res);
       }
@@ -95,60 +98,31 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
     triggerRecompute(val);
   };
 
-  // Financial Liquidity Estimates based on active metrics and threshold
-  const financialStats = useMemo(() => {
-    const totalVolume = 1695600;
-    const matchRate = currentMetrics?.match_rate ?? 0.707;
-    const cleanRate = Math.min(0.95, Math.max(0.50, 1.38 - threshold * 0.9));
-    
-    const unblockedAmt = Math.round(totalVolume * (currentMetrics ? matchRate : cleanRate));
-    const quarantinedAmt = totalVolume - unblockedAmt;
-    const totalRecords = currentMetrics?.total_records ?? 80;
-    const matchedRecords = currentMetrics?.matched_count ?? Math.round(totalRecords * cleanRate);
-    const exceptionRecords = totalRecords - matchedRecords;
-
-    return {
-      unblockedVolume: `₹${unblockedAmt.toLocaleString('en-IN')}`,
-      quarantinedVolume: `₹${quarantinedAmt.toLocaleString('en-IN')}`,
-      unblockedRaw: unblockedAmt,
-      quarantinedRaw: quarantinedAmt,
-      matchedRecords,
-      exceptionRecords,
-      totalRecords
-    };
-  }, [currentMetrics, threshold]);
+  const bankTransactions = transactions.filter((item) => item.bank_record);
+  const matchedTransactions = bankTransactions.filter((item) => ['matched_clean', 'matched_with_discrepancy'].includes(item.status));
+  const exceptionTransactions = bankTransactions.filter((item) => item.status === 'exception');
+  const formatAmount = (amount) => `₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const financialStats = {
+    totalVolume: bankTransactions.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0),
+    unblockedRaw: matchedTransactions.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0),
+    quarantinedRaw: exceptionTransactions.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0),
+    unblockedVolume: formatAmount(matchedTransactions.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0)),
+    quarantinedVolume: formatAmount(exceptionTransactions.reduce((sum, item) => sum + Number(item.bank_record.amount || 0), 0)),
+    matchedRecords: matchedTransactions.length,
+    exceptionRecords: exceptionTransactions.length,
+    totalRecords: bankTransactions.length,
+  };
 
   const hasUnappliedChanges = Math.abs(threshold - appliedThreshold) > 0.005;
 
-  // Plain English Policy Insight
-  const policyInsight = useMemo(() => {
-    if (threshold >= 0.82) {
-      return {
-        title: 'Ultra-Conservative Statutory Mode',
-        color: '#8B5CF6',
-        border: 'rgba(139, 92, 246, 0.3)',
-        bg: 'rgba(139, 92, 246, 0.06)',
-        desc: 'Prioritizing zero false matches. Only near-perfect matches are auto-cleared. Guaranteed 100% audit safety, with slightly higher exception volume held in suspense for manual sign-off.'
-      };
-    } else if (threshold <= 0.68) {
-      return {
-        title: 'High-Velocity Accelerated Mode',
-        color: '#6366F1',
-        border: 'rgba(99, 102, 241, 0.3)',
-        bg: 'rgba(99, 102, 241, 0.06)',
-        desc: 'Prioritizing merchant payout velocity. Auto-settles 85%+ of transactions and absorbs minor rounding variances. Ideal for daily flash sales and high-inflow days.'
-      };
-    } else {
-      return {
-        title: 'Optimal Conformal Operating Point (Stanford CRC Certified)',
-        color: '#10B981',
-        border: 'rgba(16, 185, 129, 0.3)',
-        bg: 'rgba(16, 185, 129, 0.06)',
-        desc: 'Statistically calibrated point satisfying α ≤ 0.001 error bound. Delivers optimal 96.5% precision with 86.2% recall rate — minimal manual review while strictly barring duplicate or wrongful claims.'
-      };
-    }
-  }, [threshold]);
-
+  // Describe only the configured cutoff; do not infer policy outcomes.
+  const policyInsight = {
+    title: `Current acceptance threshold ${threshold.toFixed(2)}`,
+    color: '#6366F1',
+    border: 'rgba(99, 102, 241, 0.3)',
+    bg: 'rgba(99, 102, 241, 0.06)',
+    desc: 'This score cutoff changes decisions when the run is recomputed. It does not establish a risk guarantee.',
+  };
   // Chart Geometry
   const svgWidth = 820;
   const svgHeight = 260;
@@ -156,57 +130,18 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
   const padRight = 45;
   const padTop = 35;
   const padBottom = 45;
-
   const chartInnerWidth = svgWidth - padLeft - padRight;
   const chartInnerHeight = svgHeight - padTop - padBottom;
-
   const minThresh = 0.55;
   const maxThresh = 0.90;
-
   const getSvgX = (t) => padLeft + ((t - minThresh) / (maxThresh - minThresh)) * chartInnerWidth;
   const getSvgYPct = (rate) => padTop + (1 - Math.max(0, Math.min(1, rate))) * chartInnerHeight;
-  const getSvgYRupees = (amt) => {
-    const maxAmt = 1800000;
-    return padTop + (1 - Math.max(0, Math.min(maxAmt, amt)) / maxAmt) * chartInnerHeight;
-  };
-
-  // Base Points
-  const displayPoints = sweepPoints.length > 0 ? sweepPoints : [
-    { threshold: 0.55, precision: 0.88, recall: 0.98, f1_score: 0.93 },
-    { threshold: 0.60, precision: 0.90, recall: 0.95, f1_score: 0.92 },
-    { threshold: 0.65, precision: 0.92, recall: 0.92, f1_score: 0.92 },
-    { threshold: 0.70, precision: 0.94, recall: 0.89, f1_score: 0.91 },
-    { threshold: 0.75, precision: 0.965, recall: 0.862, f1_score: 0.91 },
-    { threshold: 0.80, precision: 0.98, recall: 0.80, f1_score: 0.88 },
-    { threshold: 0.85, precision: 0.99, recall: 0.72, f1_score: 0.83 },
-    { threshold: 0.90, precision: 1.00, recall: 0.61, f1_score: 0.76 }
-  ];
-
-  // Financial Curves
-  const totalPool = 1695600;
-  const unblockedPoly = displayPoints
-    .map((pt) => {
-      const unblocked = totalPool * pt.recall;
-      return `${getSvgX(pt.threshold)},${getSvgYRupees(unblocked)}`;
-    })
-    .join(' ');
-
-  const quarantinedPoly = displayPoints
-    .map((pt) => {
-      const quarantined = totalPool * (1 - pt.recall);
-      return `${getSvgX(pt.threshold)},${getSvgYRupees(quarantined)}`;
-    })
-    .join(' ');
-
-  // Precision / Recall Curves
-  const precisionPoly = displayPoints
-    .map((pt) => `${getSvgX(pt.threshold)},${getSvgYPct(pt.precision)}`)
-    .join(' ');
-
-  const recallPoly = displayPoints
-    .map((pt) => `${getSvgX(pt.threshold)},${getSvgYPct(pt.recall)}`)
-    .join(' ');
-
+  const getSvgYRupees = (amt) => padTop + (1 - Math.max(0, Math.min(financialStats.totalVolume, amt)) / Math.max(financialStats.totalVolume, 1)) * chartInnerHeight;
+  const displayPoints = sweepPoints;
+  const unblockedPoly = '';
+  const quarantinedPoly = '';
+  const precisionPoly = displayPoints.filter((pt) => pt.precision_available).map((pt) => `${getSvgX(pt.threshold)},${getSvgYPct(pt.precision)}`).join(' ');
+  const recallPoly = displayPoints.map((pt) => `${getSvgX(pt.threshold)},${getSvgYPct(pt.recall)}`).join(' ');
   const activeX = Math.max(padLeft, Math.min(svgWidth - padRight, getSvgX(threshold)));
 
   return (
@@ -258,7 +193,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
 
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontSize: '12.5px', color: '#34D399', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={13} /> Optimal CRC Target: 0.75
+                  <Sparkles size={13} /> Current cutoff: {threshold.toFixed(2)}
                 </span>
                 <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
                   Active Engine Cutoff: <strong>λ = {appliedThreshold.toFixed(2)}</strong>
@@ -294,7 +229,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
               {recomputing ? (
                 <>
                   <RefreshCw size={15} className="animate-spin" />
-                  <span>Re-scoring 80 Records...</span>
+                  <span>Recomputing {financialStats.totalRecords} bank records...</span>
                 </>
               ) : hasUnappliedChanges ? (
                 <>
@@ -304,7 +239,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
               ) : (
                 <>
                   <CheckCircle2 size={15} />
-                  <span>Batch Re-scored & Synced</span>
+                  <span>Recompute complete</span>
                 </>
               )}
             </motion.button>
@@ -318,7 +253,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
               ) : hasUnappliedChanges ? (
                 <span style={{ color: '#F59E0B', fontWeight: '600' }}>⚠ Threshold changed — click button to recompute</span>
               ) : (
-                <span>● Engine idle and verified with Merkle root</span>
+                <span>● Current run state loaded</span>
               )}
             </div>
           </div>
@@ -337,17 +272,17 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
           />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-            <span>0.50 (Permissive / High Velocity)</span>
-            <span style={{ color: '#8B5CF6', fontWeight: '800' }}>0.75 (Recommended / Provable CRC Bound)</span>
+            <span>0.50 (Permissive / )</span>
+            <span style={{ color: '#8B5CF6', fontWeight: '800' }}>Configured default: 0.75</span>
             <span>0.95 (Ultra-Conservative / High Precision)</span>
           </div>
 
           {/* Standard Presets */}
           <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
             {[
-              { val: 0.65, label: '0.65 (High Velocity)' },
-              { val: 0.75, label: '0.75 (CRC Optimal ★)' },
-              { val: 0.85, label: '0.85 (Audit Safe)' }
+              { val: 0.65, label: '0.65 ()' },
+              { val: 0.75, label: '0.75 (Default)' },
+              { val: 0.85, label: '0.85' }
             ].map((preset) => {
               const isActive = Math.abs(threshold - preset.val) < 0.01;
               return (
@@ -400,59 +335,61 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
 
       {/* EXECUTIVE FINANCIAL METRICS (Primary Business View) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-        {/* Metric 1: Auto-Match Clearance Rate */}
+        {/* Metric 1: Bank Match Rate */}
         <div className="metric-card" style={{ borderLeft: '3px solid #34D399' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="metric-label">Auto-Match Clearance Rate</span>
+            <span className="metric-label">Bank Match Rate</span>
             <span style={{ fontSize: '10px', color: '#34D399', fontWeight: '700' }}>AUTOMATION</span>
           </div>
           <span className="metric-value" style={{ color: '#34D399' }}>
-            {((currentMetrics?.match_rate ?? 0.707) * 100).toFixed(1)}%
+            {summary ? `${(summary.bank_match_rate * 100).toFixed(1)}%` : 'Not available'}
           </span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            {financialStats.matchedRecords} of {financialStats.totalRecords} records auto-resolved
+            {summary ? `${financialStats.matchedRecords} of ${financialStats.totalRecords} bank records matched` : 'Run data unavailable'}
           </span>
         </div>
 
         {/* Metric 2: Unblocked Merchant Liquidity */}
         <div className="metric-card" style={{ borderLeft: '3px solid #8B5CF6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="metric-label">Unblocked Merchant Capital</span>
+            <span className="metric-label">Matched Bank Amount</span>
             <span style={{ fontSize: '10px', color: '#8B5CF6', fontWeight: '700' }}>LIQUIDITY</span>
           </div>
           <span className="metric-value" style={{ color: '#8B5CF6' }}>
-            {financialStats.unblockedVolume}
+            {summary ? financialStats.unblockedVolume : 'Not available'}
           </span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Safe for instant bank disbursement
+            Observed amount among matched bank records
           </span>
         </div>
 
         {/* Metric 3: Quarantined Capital in Escrow */}
         <div className="metric-card" style={{ borderLeft: '3px solid #F43F5E' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="metric-label">Quarantined Risk (Escrow)</span>
+            <span className="metric-label">Exception Bank Amount</span>
             <span style={{ fontSize: '10px', color: '#F43F5E', fontWeight: '700' }}>EXPOSURE</span>
           </div>
           <span className="metric-value" style={{ color: '#F43F5E' }}>
-            {financialStats.quarantinedVolume}
+            {summary ? financialStats.quarantinedVolume : 'Not available'}
           </span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            {financialStats.exceptionRecords} exceptions held in suspense
+            {financialStats.exceptionRecords} bank-side exceptions
           </span>
         </div>
 
-        {/* Metric 4: Statutory Audit Safety */}
+        {/* Metric 4: Empirical benchmark precision */}
         <div className="metric-card" style={{ borderLeft: '3px solid #A78BFA' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="metric-label">Statutory Audit Safety</span>
-            <span style={{ fontSize: '10px', color: '#A78BFA', fontWeight: '700' }}>COMPLIANCE</span>
+            <span className="metric-label">Observed precision (labeled data)</span>
+            <span style={{ fontSize: '10px', color: '#A78BFA', fontWeight: '700' }}>EVALUATION</span>
           </div>
           <span className="metric-value" style={{ color: '#A78BFA' }}>
-            {currentMetrics?.precision ? `${(currentMetrics.precision * 100).toFixed(1)}%` : '96.5%'}
+            {currentMetrics?.precision_available ? `${(currentMetrics.precision * 100).toFixed(1)}%` : 'Not available'}
           </span>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            {currentMetrics?.false_positives === 0 ? '✓ Zero False-Positive Traps' : `${currentMetrics?.false_positives ?? 0} False Positive Traps`}
+            {currentMetrics?.precision_available
+              ? `${currentMetrics.correct_matches} / ${currentMetrics.predicted_match_count} predicted matches correct`
+              : 'No predicted matches to evaluate'}
           </span>
         </div>
       </div>
@@ -471,13 +408,13 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
           <div>
             <h3 style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>
               {chartMode === 'financial'
-                ? 'Capital Velocity vs. Quarantined Risk Sensitivity Curve'
-                : 'Auditor Statistical Sensitivity Curve (Precision vs. Recall)'}
+                ? 'Currency totals by threshold'
+                : 'Observed precision and recall by threshold'}
             </h3>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>
               {chartMode === 'financial'
-                ? 'Visualizes how tuning acceptance threshold (λ) directly unblocks merchant cash flow versus holding risk in escrow.'
-                : 'Auditor-certified statistical trade-off curve plotting Precision (Green) vs. Recall (Blue) across candidate thresholds.'}
+                ? 'Per-threshold currency totals are not available from the sweep API. (λ) directly unblocks merchant cash flow versus holding risk in escrow.'
+                : 'Empirical metrics returned for the labeled sweep on this run. plotting Precision (Green) vs. Recall (Blue) across candidate thresholds.'}
             </p>
           </div>
 
@@ -496,7 +433,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
                 border: 'none'
               }}
             >
-              Treasury Cash Flow View (₹)
+              Current run amounts (₹)
             </button>
             <button
               onClick={() => setChartMode('auditor')}
@@ -511,7 +448,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
                 border: 'none'
               }}
             >
-              Auditor Statistical View (%)
+              Labeled sweep metrics (%)
             </button>
           </div>
         </div>
@@ -521,10 +458,10 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
           {chartMode === 'financial' ? (
             <>
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8B5CF6' }}>
-                <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px' }} /> Unblocked Merchant Capital (₹)
+                <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px' }} /> Matched Bank Amount (₹)
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#F43F5E' }}>
-                <span style={{ width: '12px', height: '4px', background: '#F43F5E', borderRadius: '2px' }} /> Quarantined Risk in Escrow (₹)
+                <span style={{ width: '12px', height: '4px', background: '#F43F5E', borderRadius: '2px' }} /> Exception bank amount (₹)
               </span>
             </>
           ) : (
@@ -533,7 +470,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
                 <span style={{ width: '12px', height: '4px', background: '#34D399', borderRadius: '2px' }} /> Precision Rate (Audit Rigor)
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#8B5CF6' }}>
-                <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px' }} /> Recall Rate (Yield)
+                <span style={{ width: '12px', height: '4px', background: '#8B5CF6', borderRadius: '2px' }} /> Observed recall
               </span>
             </>
           )}
@@ -547,7 +484,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
           <svg width={svgWidth} height={svgHeight} style={{ overflow: 'visible', margin: '0 auto', display: 'block' }}>
             {/* Y-Axis Grid Lines & Labels */}
             {chartMode === 'financial'
-              ? [1800000, 1400000, 1000000, 600000, 200000].map((amt) => {
+                    ? [].map((amt) => {
                   const y = getSvgYRupees(amt);
                   return (
                     <g key={amt}>
@@ -573,7 +510,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
             {/* X-Axis Vertical Lines & Labels */}
             {[0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90].map((t) => {
               const x = getSvgX(t);
-              const isOptimal = Math.abs(t - 0.75) < 0.001;
+              const isOptimal = false;
               return (
                 <g key={t}>
                   <line
@@ -597,7 +534,7 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
                   </text>
                   {isOptimal && (
                     <text x={x} y={svgHeight - padBottom + 28} textAnchor="middle" fill="#34D399" fontSize="9px" fontWeight="700">
-                      ★ CRC Target
+                      Current threshold
                     </text>
                   )}
                 </g>
@@ -606,10 +543,13 @@ export default function ThresholdPlaygroundView({ runId, onThresholdChange }) {
 
             {/* Polylines based on mode */}
             {chartMode === 'financial' ? (
-              <>
-                <polyline fill="none" stroke="#8B5CF6" strokeWidth="3" points={unblockedPoly} strokeLinecap="round" strokeLinejoin="round" />
-                <polyline fill="none" stroke="#F43F5E" strokeWidth="3" points={quarantinedPoly} strokeLinecap="round" strokeLinejoin="round" />
-              </>
+              <text x={svgWidth / 2} y={svgHeight / 2} textAnchor="middle" fill="var(--text-muted)" fontSize="13px">
+                Currency totals are not available for threshold sweep points.
+              </text>
+            ) : !displayPoints.length ? (
+              <text x={svgWidth / 2} y={svgHeight / 2} textAnchor="middle" fill="var(--text-muted)" fontSize="13px">
+                Labeled threshold sweep is not available for this run.
+              </text>
             ) : (
               <>
                 <polyline fill="none" stroke="#34D399" strokeWidth="3" points={precisionPoly} strokeLinecap="round" strokeLinejoin="round" />
