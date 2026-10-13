@@ -17,17 +17,17 @@ if sys.platform == "win32":
 # Automatically load environment variables from .env file
 load_dotenv()
 
+# Backward compatibility re-exports for test harnesses and API consumers
 from backend.services.run_service import (
     RUNS, RunSession, init_default_demo_run, list_active_runs
 )
 from backend.services.ingestion_service import (
-    normalize_uploaded_frame as _normalize_uploaded_frame,
-    MAX_UPLOAD_BYTES, MAX_SOURCE_ROWS, MAX_SYNTHETIC_BANK_ROWS, MAX_FIELD_LENGTH,
-    SOURCE_REQUIRED_COLUMNS, SOURCE_ID_COLUMNS
+    normalize_uploaded_frame as _normalize_uploaded_frame
 )
 from backend.services.export_service import (
     escape_csv_formula_value as _escape_csv_formula_value
 )
+
 
 from backend.routers import (
     runs, reconciliation, assistant, reports, actions

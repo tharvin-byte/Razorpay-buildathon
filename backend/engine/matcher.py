@@ -5,18 +5,6 @@ from backend.models.schemas import (
     ReconciliationResult, SignalBreakdown, DiscrepancyDetail,
     AgentTraceStep, LedgerRecord
 )
-
-def _clean_bank_dict(d: Dict[str, Any]) -> Dict[str, Any]:
-    c = dict(d)
-    c["bank_txn_id"] = clean_str(c.get("bank_txn_id", ""))
-    c["date"] = clean_str(c.get("date", ""))
-    c["amount"] = clean_float(c.get("amount", 0.0))
-    c["type"] = clean_str(c.get("type", "credit")).lower() or "credit"
-    c["counterparty_account"] = clean_str(c.get("counterparty_account", ""))
-    c["narration"] = clean_str(c.get("narration", ""))
-    c["utr_number"] = clean_str(c.get("utr_number", "")) or None
-    return c
-
 def _clean_ledger_dict(d: Dict[str, Any]) -> Dict[str, Any]:
     c = dict(d)
     c["ledger_entry_id"] = clean_str(c.get("ledger_entry_id", ""))
