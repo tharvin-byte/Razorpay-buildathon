@@ -25,9 +25,9 @@
 
 ---
 
-ReconX reconciles multi-source financial inflows — **Nodal Bank Statements**, **ERP General Ledgers**, and **Payment Gateway Settlement feeds** — using a deterministic multi-agent pipeline. It identifies discrepancies (MDR fees, 18% statutory GST splits, timing lags), quarantines ambiguous matches instead of guessing, and generates audit-ready enterprise outputs (ERP vouchers, dispute letters, statutory dossiers). Every finalized decision is sealed in an immutable SHA-256 Merkle audit tree.
+ReconX is an in-memory reconciliation demo for bank, ledger, and settlement data. It scores candidate matches, reports discrepancies, and abstains when available evidence is insufficient. Synthetic demo runs are enabled; CSV uploads remain disabled until authenticated access is configured. Run results are not accounting approval, regulatory filings, or auditor attestation.
 
-The system runs **100% on-premise** with zero external LLM dependencies — designed for regulated Indian financial environments under RBI Nodal Escrow directives and the DPDP Act 2023.
+The backend can use the optional Gemini integration for assistant responses. Authentication and production financial-data handling are not configured. Do not use this demo with live financial data.
 
 ---
 
@@ -55,7 +55,7 @@ The system runs **100% on-premise** with zero external LLM dependencies — desi
     <td align="center" width="50%">
       <img src="docs/images/nodal_flow.png" alt="Nodal Escrow Flow" width="100%"/>
       <br/><strong>Nodal Escrow Flow</strong><br/>
-      <sub>4-stage RBI-compliant fund flow with MDR & GST decomposition</sub>
+      <sub>Illustrative transaction flow from available run fields</sub>
     </td>
   </tr>
   <tr>
@@ -74,82 +74,10 @@ The system runs **100% on-premise** with zero external LLM dependencies — desi
 
 ---
 
-## 📑 Table of Contents
+## Benchmarks
 
-- [Architecture](#-architecture)
-- [The 4 Agent Pipeline](#-the-4-agent-pipeline)
-- [Key Features](#-key-features)
-- [Benchmark Metrics](#-benchmark-metrics)
-- [Quick Start](#-quick-start)
-- [Project Structure](#-project-structure)
-- [API Reference](#-api-reference)
-- [Design Decisions](#-design-decisions)
-- [Roadmap](#-roadmap)
+No independently verified benchmark report is maintained in this repository. Use the bundled synthetic fixtures and tests to measure behavior in your environment.
 
----
-
-## 🏗 Architecture
-
-```text
-┌─────────────────┐       ┌─────────────────┐       ┌─────────────────────┐
-│ Nodal Bank Feed │       │ ERP Ledger Feed │       │ Gateway Settlements │
-└────────┬────────┘       └────────┬────────┘       └──────────┬──────────┘
-         └─────────────────┬───────┴───────────────────────────┘
-                           │
-                 ┌─────────▼──────────┐
-                 │   Planner Agent    │
-                 │  O(1) Inverted     │
-                 │  Hash Index Build  │
-                 └─────────┬──────────┘
-                           │
-             ┌─────────────┴─────────────┐
-             ▼                           ▼
-    ┌────────────────┐         ┌──────────────────────┐
-    │  Exact Match   │         │ NarrationParserAgent  │
-    │  Score = 1.0   │         │ Regex + Subword Token │
-    └───────┬────────┘         └──────────┬───────────┘
-            │                             │
-            │                  ┌──────────▼───────────┐
-            │                  │ 5-Channel Orthogonal │
-            │                  │    Scoring Engine     │
-            │                  │ ─────────────────────│
-            │                  │ • UTR Hash     (0.45)│
-            │                  │ • Invoice Ref  (0.25)│
-            │                  │ • Counterparty (0.15)│
-            │                  │ • Amount+MDR   (0.10)│
-            │                  │ • Date Decay   (0.05)│
-            │                  └──────────┬───────────┘
-            └─────────────┬───────────────┘
-                          │
-              ┌───────────▼────────────┐
-              │  DecisionMaker Agent   │
-              │  1:1 Mutex + Δ<0.08   │
-              │  Abstention Filter     │
-              └───────────┬────────────┘
-                          │
-            ┌─────────────┴─────────────┐
-            ▼                           ▼
-   ┌────────────────┐        ┌──────────────────┐
-   │ Discrepancy    │        │ AML Suspense     │
-   │ Agent          │        │ Registry         │
-   │ (MDR + GST)    │        │ (Quarantined)    │
-   └───────┬────────┘        └────────┬─────────┘
-           │                          │
-   ┌───────▼────────┐        ┌───────▼──────────┐
-   │ ERPVoucher     │        │ BankDispute      │
-   │ Agent          │        │ Agent            │
-   │ Tally/Zoho     │        │ NPCI Form-1      │
-   └───────┬────────┘        └───────┬──────────┘
-           └─────────────┬───────────┘
-                         │
-              ┌──────────▼──────────┐
-              │  SHA-256 Merkle     │
-              │  Audit Tree         │
-              │  (64-hex Root Hash) │
-              └─────────────────────┘
-```
-
----
 
 ## 🤖 The 4 Agent Pipeline
 
@@ -158,7 +86,7 @@ The system runs **100% on-premise** with zero external LLM dependencies — desi
 | 1 | **Planner Agent** | Ingests and normalizes multi-format CSVs. Builds `O(1)` inverted index trees across UTRs, Order IDs, and timestamps for sub-millisecond lookups. |
 | 2 | **NarrationParser Agent** | Extracts structured tokens (UPI handles, IMPS codes, POS terminal IDs, MDR tags) from unstructured Indian bank narration strings using regex + subword tokenization. |
 | 3 | **DecisionMaker Agent** | Runs 5-channel orthogonal scoring. Resolves 1:1 matches with a linear-claim mutex. Routes low-confidence pairs (Δ < 0.08) to quarantine instead of guessing. |
-| 4 | **Discrepancy & Audit Agent** | Decomposes fee variances (2% MDR + 18% GST), generates Big-4-style audit memos, synthesizes ERP vouchers and dispute letters, and seals all decisions into the Merkle tree. |
+| 4 | **Discrepancy Agent** | Summarizes observed field differences and run results. Unexplained differences are held for review. |
 
 ---
 
@@ -169,38 +97,21 @@ The system runs **100% on-premise** with zero external LLM dependencies — desi
 - **O(1) Fast-Path Matching** — Inverted hash index for clean UTR/invoice lookups before fuzzy fallback
 - **5-Channel Orthogonal Scoring** — Weighted signal combination across reference IDs, narrations, amounts, and timestamps
 - **Abstention on Ambiguity** — Records with confidence gap < 8% between top-2 candidates are quarantined, not force-matched
-- **Conformal Risk Profiling** — Distribution-free confidence bounds when labelled ground truth is available (Angelopoulos et al., Stanford CRC)
+- **Labeled Evaluation** - Reports empirical metrics when bundled ground-truth labels are available; this does not establish a statistical risk guarantee
 
 ### Enterprise Outputs
-- **ERP Journal Vouchers** — Auto-generated balanced Debit/Credit vouchers → Tally XML & Zoho JSON export
-- **Bank Dispute Claims** — Statutory NPCI Form-1 recovery letters with embedded UTR evidence (PSS Act 2007 §10)
-- **Nodal Escrow Flow** — 4-stage RBI-compliant visualization: Customer → Gateway → Escrow → Merchant
-- **SHA-256 Merkle Audit Tree** — Cryptographic tamper-evident attestation of all reconciliation decisions
-- **Statutory Audit Dossier** — Structured RBI Master Direction §25A export for external auditors
+- **ERP Voucher Export** - Exports supported balanced entries to Tally XML; unsupported accounting treatments are held for manual review
+- **Discrepancy Review** - Displays source-record exceptions for human investigation; it does not prepare legal claims
+- **Transaction Flow View** - Visualizes available records and derived fields; it does not establish regulatory compliance
+- **Run Result Digest** - Provides an internal SHA-256 digest of run results, without external anchoring
+- **Run Report** - Exports computed reconciliation counts and observed metrics
 
 ### Intelligence & Operations
 - **15-View Enterprise Dashboard** — React 19 + Vite with Framer Motion animations
 - **Natural Language Financial Copilot** — Gemini 2.5 Flash-powered query assistant (with rule-based fallback)
-- **Threshold Playground** — Interactive confidence threshold tuning with live precision/recall sweep
-- **Agent Trace Explorer** — Step-by-step explainable reasoning for every transaction decision
-- **6 Simulation Scenarios** — Mass refund storm, RTGS timing lag, MDR overcharge, and more
-
----
-
-## 📊 Benchmark Metrics
-
-> Tested on a standard developer machine (Intel i7 / 16 GB RAM) using the bundled synthetic dataset (`seed=42`, 70 bank × 100 ledger × settlement feed).
-
-| Metric | Observed Value | Notes |
-|:---|:---|:---|
-| **Match Rate** | ~85–92% | Varies with narration quality and UTR availability |
-| **Throughput** | ~2.1s / 1,000-record batch | Single-threaded, in-memory, no database I/O |
-| **MDR & GST Decomposition** | High precision on contractual fee structures | Based on fixed 2% MDR + 18% GST rules |
-| **Abstention Rate** | ~5–12% quarantined | Records where Δ score < 0.08 between top-2 candidates |
-| **Conformal Error Bound (α)** | ≤ 0.001 target | Requires ground-truth labels; N/A on unlabelled data |
-| **Merkle Root Generation** | < 5ms per run | SHA-256 over all finalized match pairs |
-
-> **⚠️ Important Disclaimer:** All metrics above are measured on **synthetic benchmark data** generated by `data_generator.py`. Performance on real-world production data will vary based on data quality, narration consistency, UTR availability, and institutional formatting differences. This system is a functional prototype validated against synthetic ground truth.
+- **Threshold Playground** - Recomputes decisions at selected thresholds; labeled precision/recall appears only when available
+- **Agent Trace Explorer** - Displays recorded processing trace steps when present
+- **Scenario Views** — Displays run-derived scenario information where available; no synthetic financial outcomes are presented as live results
 
 ---
 
@@ -250,7 +161,7 @@ When configured, the Financial Copilot uses `gemini-2.5-flash` for natural langu
 ### Running Tests
 
 ```bash
-python -m pytest backend/tests/ -v   # 22 automated test suites
+python -m pytest backend/tests/ -v   # 68 tests across 10 test files
 ```
 
 The platform bootstraps a demo run (`demo-run-001`) on startup with 70 bank records, 100 ledger entries, and embedded ground truth.
@@ -294,17 +205,17 @@ reconx/
 
 | Endpoint | Method | Description |
 |:---|:---:|:---|
-| `/upload` | `POST` | Upload 2–3 CSV sources or generate synthetic batch |
+| `/upload` | `POST` | Generate synthetic demo data. CSV uploads return 503 until authenticated access is configured. |
 | `/run/{run_id}` | `POST` | Trigger the reconciliation pipeline |
 | `/run/{run_id}/status` | `GET` | Real-time progress: agent stage, processed count |
-| `/run/{run_id}/summary` | `GET` | Executive KPIs, match rates, Merkle root hash |
+| `/run/{run_id}/summary` | `GET` | Run counts, explicitly denominated rates, and internal result digest. |
 | `/run/{run_id}/transactions` | `GET` | Filtered transaction list with confidence scores |
 | `/run/{run_id}/transaction/{id}` | `GET` | Single-transaction forensic trace |
 | `/run/{run_id}/discrepancies` | `GET` | MDR fee splits, GST deductions, timing lags |
 | `/run/{run_id}/exceptions` | `GET` | Bank orphans and ledger orphans |
 | `/run/{run_id}/erp-vouchers` | `GET` | Auto-generated double-entry accounting vouchers |
-| `/run/{run_id}/disputes` | `GET` | NPCI Form-1 statutory dispute letters |
-| `/run/{run_id}/statutory-dossier` | `GET` | RBI §25A audit dossier export |
+| `/run/{run_id}/disputes` | `GET` | Legacy endpoint for generated dispute records; not a validated regulatory filing. |
+| `/run/{run_id}/statutory-dossier` | `GET` | Legacy route returning a reconciliation run report. |
 | `/run/{run_id}/recompute` | `POST` | Recompute threshold without re-running pipeline |
 | `/run/{run_id}/threshold_sweep` | `GET` | Precision/recall sweep across confidence thresholds |
 | `/chat` | `POST` | Natural language Financial Copilot query |
@@ -321,7 +232,7 @@ Three constraints make cloud LLM approaches unsuitable for Indian fintech reconc
 
 | Constraint | Impact |
 |:---|:---|
-| **Regulatory** | RBI Nodal Escrow directives + DPDP Act 2023 restrict raw PII export to third-party systems. Statutory audits require deterministic, reproducible outputs. |
+| **Regulatory** | This repository does not implement a regulatory compliance assessment. |
 | **Accounting Semantics** | Double-entry bookkeeping requires discrete binary decisions. Probabilistic soft scores from LLMs are incompatible with general ledger posting rules. |
 | **Scale & Cost** | At NPCI-scale volumes (billions of monthly UPI transactions), per-token LLM costs and 1–3s inference latency are operationally unviable. |
 

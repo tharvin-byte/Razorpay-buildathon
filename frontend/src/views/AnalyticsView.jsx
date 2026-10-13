@@ -22,36 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api';
 import TransactionInspectorDrawer from '../components/TransactionInspectorDrawer';
 import PageHeader from '../components/PageHeader';
-
-function AnimatedNumber({ value, prefix = '₹', decimals = 2 }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    const startValue = displayValue;
-    const endValue = value;
-    const duration = 750;
-
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(startValue + (endValue - startValue) * easeProgress);
-
-      if (progress < 1) {
-        window.requestAnimationFrame(step);
-      }
-    };
-
-    window.requestAnimationFrame(step);
-  }, [value]);
-
-  return (
-    <span>
-      {prefix}{displayValue.toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
-    </span>
-  );
-}
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function AnalyticsView({ runId, setView, setSelectedTxnId }) {
   const [transactions, setTransactions] = useState([]);
@@ -130,9 +101,9 @@ export default function AnalyticsView({ runId, setView, setSelectedTxnId }) {
         </div>
 
         <div className="kpi-card spotlight-card">
-          <div className="kpi-label">CLEAN MATCH RATE</div>
+          <div className="kpi-label">BANK MATCH RATE</div>
           <div className="kpi-value font-mono" style={{ color: '#34D399' }}>
-            <AnimatedNumber value={(summary?.match_rate || 0.75) * 100} prefix="" decimals={1} />%
+            <AnimatedNumber value={(summary?.bank_match_rate ?? 0) * 100} prefix="" decimals={1} />%
           </div>
           <div className="kpi-subtext">Deterministic & Verified Matches</div>
         </div>

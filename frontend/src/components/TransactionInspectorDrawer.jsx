@@ -61,103 +61,20 @@ export default function TransactionInspectorDrawer({ transaction, txn, onClose, 
   const ledger = currentTxn.matched_ledger_record;
 
   const handleCopyHash = () => {
-    const hash = currentTxn.signals?.merkle_leaf_hash || '7d4a7b06ebf2135370e55f09c09b7dbb04bdf548e46e9b9e5dd1de6f2621f6ea';
+    const hash = currentTxn.signals?.merkle_leaf_hash;
+    if (!hash) return;
     navigator.clipboard.writeText(hash);
     setCopiedHash(true);
     if (onToast) onToast({ title: 'Merkle Hash Copied', message: 'SHA-256 Merkle leaf copied to clipboard.' });
     setTimeout(() => setCopiedHash(false), 2000);
   };
 
-  const handleSynthesizeVoucher = async () => {
-    setActionLoading(true);
-    try {
-      await new Promise((r) => setTimeout(r, 400));
-      const voucherXml = `<!-- TallyPrime Auto-Heal Double-Entry Journal Voucher -->
-<VOUCHER VCHTYPE="Journal" ACTION="Create">
-  <DATE>${bank?.transaction_date ? String(bank.transaction_date).replace(/-/g, '') : '20260301'}</DATE>
-  <VOUCHERNUMBER>JV-${currentTxn.record_id}</VOUCHERNUMBER>
-  <NARRATION>ReconX Auto-Reconciliation of ${currentTxn.record_id} with Invoice ${ledger?.invoice_ref || 'N/A'}</NARRATION>
-  <ALLLEDGERENTRIES.LIST>
-    <LEDGERNAME>HDFC Nodal Escrow Settlement</LEDGERNAME>
-    <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-    <AMOUNT>-${(bank?.amount || 0).toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>
-  <ALLLEDGERENTRIES.LIST>
-    <LEDGERNAME>Trade Receivables - ${ledger?.counterparty_name || 'Customer'}</LEDGERNAME>
-    <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-    <AMOUNT>${(ledger?.gross_amount || bank?.amount || 0).toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>
-</VOUCHER>`;
-
-      setActionResult({
-        type: 'voucher',
-        title: 'Tally Prime XML Voucher Synthesized',
-        code: voucherXml,
-        filename: `tally_voucher_${currentTxn.record_id}.xml`,
-        mimeType: 'application/xml',
-        timestamp: new Date().toISOString()
-      });
-      if (onToast) onToast({ title: 'Voucher Generated', message: `Balanced journal voucher generated for ${currentTxn.record_id}` });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setActionLoading(false);
-    }
+  const handleSynthesizeVoucher = () => {
+    onToast?.({ type: 'warning', title: 'Voucher unavailable', message: 'Use the run-level ERP export. This record view does not infer accounting entries.' });
   };
 
-  const handleDraftDispute = async () => {
-    setActionLoading(true);
-    try {
-      await new Promise((r) => setTimeout(r, 400));
-      const delta = Math.abs((bank?.amount || 0) - (ledger?.gross_amount || 0));
-      const isOrphan = currentTxn.status === 'exception';
-      const isVariance = currentTxn.status === 'matched_with_discrepancy';
-
-      const claimType = isOrphan 
-        ? 'UNSETTLED ORPHAN / MISSING SETTLEMENT CLAIM' 
-        : isVariance 
-        ? 'INTERMEDIARY BATCH SETTLEMENT & FEE VARIANCE INQUIRY' 
-        : 'STATUTORY AUDIT ATTESTATION CONFIRMATION';
-
-      const disputeReason = isOrphan
-        ? (currentTxn.exception_reason || 'Unrepresented orphan deposit without matching order reference')
-        : isVariance
-        ? (currentTxn.explanation || `Variance delta of INR ${delta.toFixed(2)} across bank credit and ledger invoices`)
-        : 'Transaction is 100% cleanly reconciled. Informational audit record only.';
-
-      const disputeNotice = `NPCI / ISO 20022 STATUTORY DISPUTE CLAIM NOTICE
-==================================================
-CLAIM REFERENCE : DISP-${currentTxn.record_id}
-ISSUED AT       : ${new Date().toISOString()}
-TRANSACTION ID  : ${currentTxn.record_id}
-BANK UTR        : ${bank?.utr_number || 'UNKNOWN_UTR'}
-CLAIM TYPE      : ${claimType}
-CLAIM AMOUNT    : INR ${(isVariance && delta > 0 ? delta : (bank?.amount || ledger?.gross_amount || 0)).toFixed(2)}
-COUNTERPARTY    : ${ledger?.counterparty_name || 'Unidentified Banking Counterparty'}
-
-DISPUTE REASON & ROOT CAUSE:
-${disputeReason}
-
-STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
-- SHA-256 Merkle Leaf Hash: ${currentTxn.signals?.merkle_leaf_hash || '7d4a7b06ebf2135370e55f09c09b7dbb04bdf548e46e9b9e5dd1de6f2621f6ea'}
-- Stanford Conformal Risk Error Bound: α <= 0.001 (Zero Hallucination Guaranteed)
-- Designated Nodal Account: HDFC Bank Escrow Pool (A/C: 50200088219381)
-- Regulatory Framework: RBI Master Directions on Payment Intermediaries (Section 25)`;
-
-      setActionResult({
-        type: 'dispute',
-        title: isOrphan ? 'NPCI Bank Dispute Claim Drafted' : 'Settlement Variance Inquiry Drafted',
-        code: disputeNotice,
-        filename: `npci_dispute_${currentTxn.record_id}.txt`,
-        mimeType: 'text/plain',
-        timestamp: new Date().toISOString()
-      });
-      if (onToast) onToast({ title: 'Dispute Drafted', message: `Statutory dispute notice drafted for ${currentTxn.record_id}` });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setActionLoading(false);
-    }
+  const handleDraftDispute = () => {
+    onToast?.({ type: 'warning', title: 'Dispute draft unavailable', message: 'This record view does not create or certify a regulatory filing.' });
   };
 
   const handleDownloadActionResult = () => {
@@ -617,7 +534,7 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
             </div>
           </div>
 
-          {/* Statutory Audit Memorandum & XAI Story */}
+          {/* Reconciliation run details */}
           <div
             style={{
               background: 'rgba(10, 16, 30, 0.95)',
@@ -638,7 +555,7 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
                 </div>
                 <div>
                   <span style={{ fontSize: '11px', fontWeight: '800', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-                    Statutory Audit Memorandum
+                    Reconciliation Explanation
                   </span>
                   <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '8px', fontWeight: '500' }}>
                     XAI Autonomous Narrative
@@ -646,7 +563,7 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
                 </div>
               </div>
               <span style={{ fontSize: '10px', color: '#34D399', background: 'rgba(52, 211, 153, 0.12)', border: '1px solid rgba(52, 211, 153, 0.3)', padding: '2px 8px', borderRadius: '4px', fontWeight: '700', letterSpacing: '0.4px' }}>
-                AUDITOR-CERTIFIED
+                RUN DATA SUMMARY
               </span>
             </div>
 
@@ -655,25 +572,12 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
               let rawText = currentTxn.explanation || currentTxn.exception_reason || bank?.narration || '';
               
               // Intelligent Adapter: If rawText is a batch settlement without DIAGNOSIS, structure it into the 4/5-card Big-4 set
-              if (rawText.startsWith('BATCH SETTLEMENT RESOLVED:') || (currentTxn.source_type === 'batch' && !rawText.includes('DIAGNOSIS:'))) {
-                const numLedgers = currentTxn.matched_ledger_ids?.length || 2;
-                const bankAmt = bank?.amount || 0;
-                const batchDetails = rawText.replace(/^BATCH SETTLEMENT RESOLVED:\s*/i, '').trim();
-                
-                rawText = [
-                  `DIAGNOSIS:\nConsolidated Batch Settlement (${numLedgers} Internal ERP Orders Bundled · ₹${bankAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })})`,
-                  `ROOT CAUSE:\nPayment gateway bundled ${numLedgers} internal merchant orders into a single consolidated bank payout to optimize interbank clearinghouse (NEFT/RTGS) network overhead. Bank deposit exactly balances the combined ledger receivables.`,
-                  `FINANCIAL BREAKDOWN:\nConsolidated Bank Deposit : ₹${bankAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })} [100% BATCH PARITY MATCH]\n${batchDetails}`,
-                  `STATUS & ACTION:\nResolution Status : Auto-Resolved via Multi-Leg Netting\nController Action : Synthesize Multi-Leg ERP Journal Voucher to clear linked invoice receivables.`,
-                  `AUDIT PROOF:\nVerified against master nodal batch settlement under Bank UTR '${bank?.utr_number || 'N/A'}' with ${(currentTxn.confidence_score ? currentTxn.confidence_score * 100 : 92).toFixed(1)}% conformal certainty.`
-                ].join('\n\n');
-              } else if (!rawText.includes('DIAGNOSIS:') && rawText.length > 0 && !rawText.includes('\n\n')) {
+              if (!rawText.includes('DIAGNOSIS:') && rawText.length > 0 && !rawText.includes('\n\n')) {
                 // Generic single-paragraph adapter
                 rawText = [
                   `DIAGNOSIS:\nReconciliation Assessment for ${currentTxn.record_id}`,
                   `ROOT CAUSE:\n${rawText}`,
-                  `STATUS & ACTION:\nResolution Status : Verified by Autonomous Engine\nController Action : Approved for automated general ledger reconciliation.`,
-                  `AUDIT PROOF:\nVerified under Bank UTR '${bank?.utr_number || 'N/A'}'.`
+                  `STATUS & ACTION:\n${currentTxn.status || 'Status unavailable'}\nNo accounting or audit approval is implied by this report.`
                 ].join('\n\n');
               }
 
@@ -818,7 +722,7 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
                           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                             <Shield size={12} color="#94A3B8" />
                             <span style={{ fontWeight: '700', color: '#CBD5E1', textTransform: 'uppercase', fontSize: '9.5px', letterSpacing: '0.5px' }}>
-                              Statutory Evidence:
+                              Recorded Evidence:
                             </span>
                           </div>
                           <span className="font-mono" style={{ color: '#A78BFA', fontSize: '11px' }}>
@@ -854,10 +758,10 @@ STATUTORY EVIDENCE & MERKLE AUDIT TRAIL:
           >
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Cryptographic SHA-256 Merkle Leaf Hash
+                Recorded SHA-256 Merkle Leaf Hash
               </div>
               <div className="font-mono" style={{ fontSize: '11px', color: '#34D399', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}>
-                {currentTxn.signals?.merkle_leaf_hash || '7d4a7b06ebf2135370e55f09c09b7dbb04bdf548e46e9b9e5dd1de6f2621f6ea'}
+                {currentTxn.signals?.merkle_leaf_hash || 'Not available'}
               </div>
             </div>
 

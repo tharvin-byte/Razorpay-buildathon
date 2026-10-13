@@ -35,29 +35,23 @@ def test_erp_voucher_agent_balance_invariant(executed_reconciliation):
         assert len(v.entries) >= 2
         assert "DocumentNumber" in v.sap_json_payload
 
-def test_dispute_resolution_bot_evidence_binding(executed_reconciliation):
-    """Verify that dispute claims are generated with valid UTRs and Merkle proofs."""
+def test_dispute_bot_abstains_without_validated_filing_rules(executed_reconciliation):
     summary, results = executed_reconciliation
     dispute_resp = DisputeResolutionBot.generate_disputes_for_run("test-run-99", results)
 
-    assert dispute_resp.total_claims > 0
-    assert dispute_resp.total_recoverable_capital > 0.0
+    assert dispute_resp.total_claims == 0
+    assert dispute_resp.total_recoverable_capital == 0.0
+    assert dispute_resp.claims == []
 
-    for c in dispute_resp.claims:
-        assert c.utr_number != ""
-        assert len(c.merkle_proof_hash) == 64
-        assert "FORMAL NOTICE" in c.formal_letter_text or "COMMERCIAL DISPUTE" in c.formal_letter_text
-        assert str(c.disputed_amount) in c.formal_letter_text or f"{c.disputed_amount:,.2f}" in c.formal_letter_text
-
-def test_statutory_audit_dossier_exporter(executed_reconciliation):
-    """Verify statutory RBI Form 3CB compliance dossier compilation."""
+def test_run_report_exporter(executed_reconciliation):
+    """The legacy dossier endpoint emits factual run-report data, not certification."""
     summary, results = executed_reconciliation
     dossier = AuditDossierExporter.generate_dossier_for_run(summary, results)
 
     assert dossier.run_id == "test-run-99"
-    assert dossier.clean_match_rate > 0.60
-    assert dossier.precision_rate >= 0.95
+    assert dossier.clean_match_rate == summary.match_rate
+    assert dossier.precision_rate == (summary.evaluation.precision if summary.evaluation else 0.0)
     assert len(dossier.merkle_root_hash) == 64
-    assert dossier.is_solvency_certified is True
-    assert "STATUTORY AUDIT & COMPLIANCE DOSSIER" in dossier.full_statutory_text
-    assert "FORM 3CB/CD" in dossier.full_statutory_text
+    assert dossier.is_solvency_certified is False
+    assert "RECONCILIATION RUN REPORT" in dossier.full_statutory_text
+    assert "not an auditor attestation" in dossier.full_statutory_text

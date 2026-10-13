@@ -1,97 +1,204 @@
-// BEFORE:  const API_BASE = "http://127.0.0.1:8000";
-// WHY CHANGED: The old line was hardcoded to your local machine's address.
-// When this frontend is deployed on Render (or any cloud), it would still try to
-// call "127.0.0.1" — which is the user's own browser/laptop, not the server.
-// This would break 100% of API calls in production.
-//
-// NOW: We read from a Vite environment variable (VITE_API_BASE).
-// - Locally (npm run dev): .env.development sets it to http://127.0.0.1:8000 → same as before.
-// - On Render (production build): Render injects VITE_API_BASE=https://your-backend.onrender.com
-// If the env var is missing for any reason, it falls back to "" (empty string),
-// which means the frontend and backend are served from the same origin — perfect for Docker.
+// Centralized API client with configurable timeouts, structured error handling, and transient retry logic.
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
+const DEFAULT_TIMEOUT_MS = 15000;
+
+export class ApiError extends Error {
+  constructor(message, status = 500, detail = null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+/**
+ * Enhanced fetch wrapper with:
+ * 1. AbortController / timeout handling
+ * 2. Structured FastAPI error detail extraction
+ * 3. Exponential backoff retry on idempotent GET requests
+ */
+async function request(url, options = {}, { timeout = DEFAULT_TIMEOUT_MS, retries = 0 } = {}) {
+  const method = (options.method || "GET").toUpperCase();
+  const isIdempotent = method === "GET" || method === "HEAD";
+  const maxAttempts = isIdempotent ? Math.max(1, retries + 1) : 1;
+
+  let lastError;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    // Chain external abort signals if provided
+    if (options.signal) {
+      options.signal.addEventListener("abort", () => controller.abort());
+    }
+
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        let errorData = null;
+        let errorMessage = `Request failed (${res.status} ${res.statusText})`;
+
+        try {
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            errorData = await res.json();
+            if (errorData) {
+              if (typeof errorData.detail === "string") {
+                errorMessage = errorData.detail;
+              } else if (Array.isArray(errorData.detail)) {
+                // FastAPI pydantic validation errors list
+                errorMessage = errorData.detail
+                  .map((e) => (e.loc ? `${e.loc.slice(-1)[0]}: ${e.msg}` : e.msg))
+                  .join("; ");
+              } else if (errorData.message) {
+                errorMessage = errorData.message;
+              }
+            }
+          } else {
+            const raw = await res.text();
+            if (raw && raw.length < 200) {
+              errorMessage = raw;
+            }
+          }
+        } catch {
+          // Fall back to default status text if body parsing fails
+        }
+
+        // Retry transient gateway / service unavailable errors (502, 503, 504) for idempotent calls
+        if (isIdempotent && [502, 503, 504].includes(res.status) && attempt < maxAttempts - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 300 * Math.pow(2, attempt)));
+          continue;
+        }
+
+        throw new ApiError(errorMessage, res.status, errorData);
+      }
+
+      return res;
+    } catch (err) {
+      clearTimeout(timeoutId);
+
+      if (err.name === "AbortError" && !options.signal?.aborted) {
+        lastError = new ApiError(`Request to ${url} timed out after ${timeout}ms`, 408);
+      } else {
+        lastError = err;
+      }
+
+      // Retry network errors for idempotent requests
+      const isNetworkError = !(err instanceof ApiError);
+      if (isIdempotent && isNetworkError && attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 300 * Math.pow(2, attempt)));
+        continue;
+      }
+
+      throw lastError;
+    }
+  }
+
+  throw lastError;
+}
+
+async function requestJson(url, options = {}, clientOptions = {}) {
+  const res = await request(url, options, clientOptions);
+  return res.json();
+}
 
 export const api = {
-  async getStatus(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/status`);
-    if (!res.ok) throw new Error("Failed to fetch run status");
-    return res.json();
+  async getStatus(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/status`, {}, { retries: 1, ...options });
   },
 
-  async getSources(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/sources`);
-    if (!res.ok) throw new Error("Failed to fetch sources");
-    return res.json();
+  async getSources(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/sources`, {}, { retries: 1, ...options });
   },
 
-  async getTransactions(runId, params = {}) {
-    const query = new URLSearchParams(params).toString();
-    const res = await fetch(`${API_BASE}/run/${runId}/transactions?${query}`);
-    if (!res.ok) throw new Error("Failed to fetch transactions");
-    return res.json();
+  async getTransactions(runId, params = {}, options = {}) {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+    ).toString();
+    const url = query ? `${API_BASE}/run/${runId}/transactions?${query}` : `${API_BASE}/run/${runId}/transactions`;
+    return requestJson(url, {}, { retries: 1, ...options });
   },
 
-  async getDiscrepancies(runId, discType = "") {
-    const url = discType
-      ? `${API_BASE}/run/${runId}/discrepancies?disc_type=${discType}`
-      : `${API_BASE}/run/${runId}/discrepancies`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch discrepancies");
-    return res.json();
+  async getDiscrepancies(runId, discTypeOrParams = "", extraParams = {}, options = {}) {
+    let params = {};
+    if (typeof discTypeOrParams === "object" && discTypeOrParams !== null) {
+      params = { ...discTypeOrParams };
+    } else {
+      params = { ...extraParams };
+      if (discTypeOrParams) {
+        params.disc_type = discTypeOrParams;
+      }
+    }
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+    ).toString();
+    const url = query ? `${API_BASE}/run/${runId}/discrepancies?${query}` : `${API_BASE}/run/${runId}/discrepancies`;
+    return requestJson(url, {}, { retries: 1, ...options });
   },
 
-  async getExceptions(runId, side = "") {
-    const url = side
-      ? `${API_BASE}/run/${runId}/exceptions?side=${side}`
-      : `${API_BASE}/run/${runId}/exceptions`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch exceptions");
-    return res.json();
+  async getExceptions(runId, sideOrParams = "", extraParams = {}, options = {}) {
+    let params = {};
+    if (typeof sideOrParams === "object" && sideOrParams !== null) {
+      params = { ...sideOrParams };
+    } else {
+      params = { ...extraParams };
+      if (sideOrParams) {
+        params.side = sideOrParams;
+      }
+    }
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+    ).toString();
+    const url = query ? `${API_BASE}/run/${runId}/exceptions?${query}` : `${API_BASE}/run/${runId}/exceptions`;
+    return requestJson(url, {}, { retries: 1, ...options });
   },
 
-  async getTransactionDetail(runId, txnId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/transaction/${txnId}`);
-    if (!res.ok) throw new Error("Failed to fetch transaction detail");
-    return res.json();
+  async getTransactionDetail(runId, txnId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/transaction/${txnId}`, {}, { retries: 1, ...options });
   },
 
-  async getTrace(runId, txnId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/trace/${txnId}`);
-    if (!res.ok) throw new Error("Failed to fetch trace");
-    return res.json();
+  async getTrace(runId, txnId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/trace/${txnId}`, {}, { retries: 1, ...options });
   },
 
-  async getSummary(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/summary`);
-    if (!res.ok) throw new Error("Failed to fetch summary");
-    return res.json();
+  async getSummary(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/summary`, {}, { retries: 1, ...options });
   },
 
-  async recomputeThreshold(runId, threshold) {
-    const res = await fetch(`${API_BASE}/run/${runId}/recompute`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ threshold }),
-    });
-    if (!res.ok) throw new Error("Failed to recompute threshold");
-    return res.json();
+  async recomputeThreshold(runId, threshold, options = {}) {
+    return requestJson(
+      `${API_BASE}/run/${runId}/recompute`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threshold }),
+      },
+      options
+    );
   },
 
-  async getThresholdSweep(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/threshold_sweep`);
-    if (!res.ok) throw new Error("Failed to fetch threshold sweep");
-    return res.json();
+  async getThresholdSweep(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/threshold_sweep`, {}, { retries: 1, ...options });
   },
 
-  async startRun(runId, threshold = 0.75) {
-    const res = await fetch(`${API_BASE}/run/${runId}?threshold=${threshold}`, {
-      method: "POST",
-    });
-    if (!res.ok) throw new Error("Failed to start run");
-    return res.json();
+  async startRun(runId, threshold = 0.75, options = {}) {
+    return requestJson(
+      `${API_BASE}/run/${runId}?threshold=${encodeURIComponent(threshold)}`,
+      {
+        method: "POST",
+      },
+      options
+    );
   },
 
-  async uploadOrGenerate({ bankFile, ledgerFile, settlementFile, generateSynthetic, recordsCount, seed }) {
+  async uploadOrGenerate({ bankFile, ledgerFile, settlementFile, generateSynthetic, recordsCount, seed }, options = {}) {
     const formData = new FormData();
     if (bankFile) formData.append("bank_file", bankFile);
     if (ledgerFile) formData.append("ledger_file", ledgerFile);
@@ -100,70 +207,65 @@ export const api = {
     formData.append("records_count", recordsCount || 70);
     formData.append("seed", seed || 42);
 
-    const res = await fetch(`${API_BASE}/upload`, {
-      method: "POST",
-      body: formData,
-    });
-    if (!res.ok) throw new Error("Failed to upload or generate data");
-    return res.json();
+    return requestJson(
+      `${API_BASE}/upload`,
+      {
+        method: "POST",
+        body: formData,
+      },
+      // Ingestion and file parsing can take slightly longer than default timeout
+      { timeout: 30000, ...options }
+    );
   },
 
-  async sendChatMessage(runId, question) {
-    const res = await fetch(`${API_BASE}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ run_id: runId, question }),
-    });
-    if (!res.ok) throw new Error("Failed to send chat message");
-    return res.json();
+  async sendChatMessage(runId, question, options = {}) {
+    return requestJson(
+      `${API_BASE}/chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_id: runId, question }),
+      },
+      // Gemini API calls can take up to 25s
+      { timeout: 30000, ...options }
+    );
   },
 
-  async getReport(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/report`);
-    if (!res.ok) throw new Error("Failed to fetch report");
-    return res.json();
+  async getReport(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/report`, {}, { retries: 1, ...options });
   },
 
   getDownloadUrl(runId, format = "csv") {
-    return `${API_BASE}/run/${runId}/report/download?format=${format}`;
+    return `${API_BASE}/run/${runId}/report/download?format=${encodeURIComponent(format)}`;
   },
 
-  async getErpVouchers(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/erp-vouchers`);
-    if (!res.ok) throw new Error("Failed to fetch ERP vouchers");
-    return res.json();
+  async getErpVouchers(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/erp-vouchers`, {}, { retries: 1, ...options });
   },
 
   getTallyXmlUrl(runId) {
     return `${API_BASE}/run/${runId}/erp-vouchers/tally-xml`;
   },
 
-  async downloadTallyXml(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/erp-vouchers/tally-xml`);
-    if (!res.ok) throw new Error("Failed to download Tally XML");
+  async downloadTallyXml(runId, options = {}) {
+    const res = await request(`${API_BASE}/run/${runId}/erp-vouchers/tally-xml`, {}, { retries: 1, ...options });
     return res.blob();
   },
 
-  async getDisputes(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/disputes`);
-    if (!res.ok) throw new Error("Failed to fetch bank dispute claims");
-    return res.json();
+  async getDisputes(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/disputes`, {}, { retries: 1, ...options });
   },
 
-  async getStatutoryDossier(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/statutory-dossier`);
-    if (!res.ok) throw new Error("Failed to fetch statutory audit dossier");
-    return res.json();
+  async getStatutoryDossier(runId, options = {}) {
+    return requestJson(`${API_BASE}/run/${runId}/statutory-dossier`, {}, { retries: 1, ...options });
   },
 
-  async downloadStatutoryDossier(runId) {
-    const res = await fetch(`${API_BASE}/run/${runId}/statutory-dossier/download`);
-    if (!res.ok) throw new Error("Failed to download statutory audit dossier");
+  async downloadStatutoryDossier(runId, options = {}) {
+    const res = await request(`${API_BASE}/run/${runId}/statutory-dossier/download`, {}, { retries: 1, ...options });
     return res.blob();
   },
 
   getStatutoryDossierDownloadUrl(runId) {
     return `${API_BASE}/run/${runId}/statutory-dossier/download`;
-  }
+  },
 };
-

@@ -15,36 +15,7 @@ import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
 import TransactionInspectorDrawer from '../components/TransactionInspectorDrawer';
 import PageHeader from '../components/PageHeader';
-
-function AnimatedNumber({ value }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    const startValue = displayValue;
-    const endValue = value;
-    const duration = 650;
-
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(startValue + (endValue - startValue) * easeProgress);
-
-      if (progress < 1) {
-        window.requestAnimationFrame(step);
-      }
-    };
-
-    window.requestAnimationFrame(step);
-  }, [value]);
-
-  return (
-    <span>
-      ₹{displayValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-    </span>
-  );
-}
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function DiscrepanciesView({ runId, setView, setSelectedTxnId, onToast, onNavigateTab }) {
   const [allDiscrepancies, setAllDiscrepancies] = useState([]);
@@ -91,11 +62,9 @@ export default function DiscrepanciesView({ runId, setView, setSelectedTxnId, on
   ];
 
   const totalVarianceDelta = useMemo(() => 
-    allDiscrepancies.reduce((acc, d) => {
-      const bAmt = d.bank_record?.amount ?? 0;
-      const lAmt = d.matched_ledger_record?.gross_amount ?? 0;
-      return acc + Math.abs(bAmt - lAmt);
-    }, 0),
+    allDiscrepancies.reduce((total, record) => total + (record.discrepancies || []).reduce(
+      (sum, discrepancy) => sum + Math.abs(Number(discrepancy.impact_amount || 0)), 0
+    ), 0),
     [allDiscrepancies]
   );
 
@@ -113,21 +82,21 @@ export default function DiscrepanciesView({ runId, setView, setSelectedTxnId, on
           icon={AlertTriangle}
           accentColor="#FBBF24"
           badges={[
-            { label: 'Legit Business Variances', variant: 'discrepancy' },
-            { label: 'Auto-Healable Gaps', variant: 'expected' },
+            { label: 'Recorded discrepancies', variant: 'discrepancy' },
+            { label: 'Review accounting treatment', variant: 'expected' },
           ]}
-          title="Audited Discrepancy & Root Cause Explorer"
-          description="Real payment records diverge due to legitimate business causes: MDR fee deductions before bank transfer, clearinghouse batch timing cycles, partial merchant refunds, and lump-sum batch netting."
+          title="Discrepancy Review"
+          description="Inspect amount impacts and descriptions recorded by the reconciliation pipeline. These fields do not establish a contractual or accounting cause on their own."
         />
 
         {/* 4-Column KPI Grid */}
         <div className="kpi-grid" style={{ marginBottom: '24px' }}>
           <div className="kpi-card">
-            <div className="kpi-label">Analyzed Variance Gaps</div>
+            <div className="kpi-label">Discrepancy Records</div>
             <div className="kpi-value font-mono" style={{ color: '#FBBF24' }}>
               {allDiscrepancies.length} Records
             </div>
-            <div className="kpi-subtext">Legitimate accounting deltas</div>
+            <div className="kpi-subtext">Matched records with discrepancy details</div>
           </div>
 
           <div className="kpi-card">
@@ -135,23 +104,23 @@ export default function DiscrepanciesView({ runId, setView, setSelectedTxnId, on
             <div className="kpi-value font-mono" style={{ color: '#F59E0B' }}>
               <AnimatedNumber value={totalVarianceDelta} />
             </div>
-            <div className="kpi-subtext">Underlying fee & timing variance</div>
+            <div className="kpi-subtext">Sum of absolute recorded discrepancy impacts</div>
           </div>
 
           <div className="kpi-card">
-            <div className="kpi-label">Auto-Resolution Readiness</div>
+            <div className="kpi-label">Discrepancy Records</div>
             <div className="kpi-value font-mono" style={{ color: '#34D399' }}>
-              100% Policy Mapped
+              {allDiscrepancies.length} records
             </div>
-            <div className="kpi-subtext">Zero unclassified variance</div>
+            <div className="kpi-subtext">Recorded discrepancies; accounting treatment may require review</div>
           </div>
 
           <div className="kpi-card">
             <div className="kpi-label">Mean Confidence Score</div>
             <div className="kpi-value font-mono" style={{ color: '#A78BFA' }}>
-              94.2% Conformal
+              {allDiscrepancies.length > 0 ? `${(allDiscrepancies.reduce((sum, item) => sum + Number(item.confidence_score || 0), 0) / allDiscrepancies.length * 100).toFixed(1)}%` : 'Not available'}
             </div>
-            <div className="kpi-subtext">Statutory audit trail bound</div>
+            <div className="kpi-subtext">Mean candidate score for discrepancy records</div>
           </div>
         </div>
 

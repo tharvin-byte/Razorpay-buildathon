@@ -1,6 +1,5 @@
 import json
 import random
-import uuid
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Any
@@ -41,11 +40,11 @@ class SyntheticDataGenerator:
     
     def __init__(self, seed: int = 42):
         self.seed = seed
-        random.seed(seed)
+        self.rng = random.Random(seed)
         
     def _generate_utr(self, dt: datetime, idx: int) -> str:
         date_str = dt.strftime("%Y%m%d")
-        return f"UTR{date_str}{idx:04d}{random.randint(100, 999)}"
+        return f"UTR{date_str}{idx:04d}{self.rng.randint(100, 999)}"
 
     def _generate_narration(self, rail: str, name: str, inv_ref: str, phone: str, ifsc: str) -> str:
         clean_name = name.replace(" ", "").upper()
@@ -94,30 +93,30 @@ class SyntheticDataGenerator:
             global_txn_idx += 1
             ledger_idx += 1
             
-            day_offset = random.randint(0, 5)
+            day_offset = self.rng.randint(0, 5)
             txn_date = base_dt + timedelta(days=day_offset)
             date_str = txn_date.strftime("%Y-%m-%d")
             
-            first = random.choice(self.FIRST_NAMES)
-            last = random.choice(self.LAST_NAMES)
+            first = self.rng.choice(self.FIRST_NAMES)
+            last = self.rng.choice(self.LAST_NAMES)
             full_name = f"{first} {last}"
             
-            merchant_id, _ = random.choice(self.MERCHANTS)
-            gross = round(random.uniform(500, 15000), 2)
+            merchant_id, _ = self.rng.choice(self.MERCHANTS)
+            gross = round(self.rng.uniform(500, 15000), 2)
             fee_pct = 0.015 # 1.5% Razorpay fee
             rzp_fee = round(gross * fee_pct, 2)
             net_amt = round(gross - rzp_fee, 2)
             
             utr = self._generate_utr(txn_date, global_txn_idx)
-            order_id = f"order_{uuid.uuid4().hex[:9]}"
+            order_id = f"order_{self.rng.getrandbits(36):09x}"
             inv_ref = f"INV{global_txn_idx}"
             bank_txn_id = f"BNK-{txn_date.strftime('%Y%m%d')}-{global_txn_idx}"
             ledger_id = f"LEDG-{ledger_idx:06d}"
             settle_id = f"NPCI-SET-{global_txn_idx:05d}"
             
-            rail = random.choice(["UPI", "NEFT", "IMPS"])
-            phone = f"98{random.randint(10000000, 99999999)}"
-            ifsc = f"HDFC000{random.randint(1000, 9999)}"
+            rail = self.rng.choice(["UPI", "NEFT", "IMPS"])
+            phone = f"98{self.rng.randint(10000000, 99999999)}"
+            ifsc = f"HDFC000{self.rng.randint(1000, 9999)}"
             narration = self._generate_narration(rail, full_name, inv_ref, phone, ifsc)
             
             # Bank statement record
@@ -126,7 +125,7 @@ class SyntheticDataGenerator:
                 "date": date_str,
                 "amount": net_amt,
                 "type": "credit",
-                "counterparty_account": f"XXXXXX{random.randint(1000, 9999)}",
+                "counterparty_account": f"XXXXXX{self.rng.randint(1000, 9999)}",
                 "narration": narration,
                 "utr_number": utr
             })
@@ -180,17 +179,17 @@ class SyntheticDataGenerator:
             global_txn_idx += 1
             ledger_idx += 1
             
-            day_offset = random.randint(0, 4)
+            day_offset = self.rng.randint(0, 4)
             txn_date = base_dt + timedelta(days=day_offset)
             date_str = txn_date.strftime("%Y-%m-%d")
             
-            first = random.choice(self.FIRST_NAMES)
-            last = random.choice(self.LAST_NAMES)
+            first = self.rng.choice(self.FIRST_NAMES)
+            last = self.rng.choice(self.LAST_NAMES)
             full_name = f"{first} {last}"
-            merchant_id, _ = random.choice(self.MERCHANTS)
+            merchant_id, _ = self.rng.choice(self.MERCHANTS)
             
             disc_type = discrepancy_types[i % len(discrepancy_types)]
-            gross = round(random.uniform(1000, 12000), 2)
+            gross = round(self.rng.uniform(1000, 12000), 2)
             rzp_fee = round(gross * 0.02, 2)
             refund_amt = 0.00
             bank_amt = round(gross - rzp_fee, 2)
@@ -200,7 +199,7 @@ class SyntheticDataGenerator:
             settle_date = date_str
             
             utr = self._generate_utr(txn_date, global_txn_idx)
-            order_id = f"order_{uuid.uuid4().hex[:9]}"
+            order_id = f"order_{self.rng.getrandbits(36):09x}"
             inv_ref = f"INV{global_txn_idx}"
             bank_txn_id = f"BNK-{txn_date.strftime('%Y%m%d')}-{global_txn_idx}"
             ledger_id = f"LEDG-{ledger_idx:06d}"
@@ -212,7 +211,10 @@ class SyntheticDataGenerator:
                 # Extra non-standard surcharge or fee gap of ₹25
                 extra_fee = 25.00
                 bank_amt = round(gross - (rzp_fee + extra_fee), 2)
-                expected_discs.append("fee_deduction")
+                # This fixture models an unexplained extra deduction. The
+                # available inputs do not establish a contractual fee/GST
+                # classification or an accounting treatment.
+                expected_discs.append("unreconciled_amount_gap")
                 
             elif disc_type == "timing_lag_T1":
                 # Bank records on T+1
@@ -259,7 +261,7 @@ class SyntheticDataGenerator:
                 
                 ledger_records.append({
                     "ledger_entry_id": ledger_id_2,
-                    "order_id": f"order_{uuid.uuid4().hex[:9]}",
+                    "order_id": f"order_{self.rng.getrandbits(36):09x}",
                     "merchant_id": merchant_id,
                     "expected_settlement_date": date_str,
                     "gross_amount": gross_2,
@@ -276,7 +278,7 @@ class SyntheticDataGenerator:
                     "date": bank_date,
                     "amount": combined_net,
                     "type": "credit",
-                    "counterparty_account": f"XXXXXX{random.randint(1000, 9999)}",
+                    "counterparty_account": f"XXXXXX{self.rng.randint(1000, 9999)}",
                     "narration": f"BULK-SETTLEMENT-{merchant_id}-{inv_ref}",
                     "utr_number": utr
                 })
@@ -306,9 +308,9 @@ class SyntheticDataGenerator:
                 })
                 continue
 
-            rail = random.choice(["UPI", "NEFT", "IMPS"])
-            phone = f"98{random.randint(10000000, 99999999)}"
-            ifsc = f"ICIC000{random.randint(1000, 9999)}"
+            rail = self.rng.choice(["UPI", "NEFT", "IMPS"])
+            phone = f"98{self.rng.randint(10000000, 99999999)}"
+            ifsc = f"ICIC000{self.rng.randint(1000, 9999)}"
             narration = self._generate_narration(rail, full_name, inv_ref, phone, ifsc)
             
             bank_records.append({
@@ -316,7 +318,7 @@ class SyntheticDataGenerator:
                 "date": bank_date,
                 "amount": bank_amt,
                 "type": "credit",
-                "counterparty_account": f"XXXXXX{random.randint(1000, 9999)}",
+                "counterparty_account": f"XXXXXX{self.rng.randint(1000, 9999)}",
                 "narration": narration,
                 "utr_number": utr
             })
@@ -363,20 +365,20 @@ class SyntheticDataGenerator:
             global_txn_idx += 1
             ledger_idx += 1
             
-            day_offset = random.randint(0, 3)
+            day_offset = self.rng.randint(0, 3)
             txn_date = base_dt + timedelta(days=day_offset)
             date_str = txn_date.strftime("%Y-%m-%d")
             
-            first = random.choice(self.FIRST_NAMES)
-            last = random.choice(self.LAST_NAMES)
+            first = self.rng.choice(self.FIRST_NAMES)
+            last = self.rng.choice(self.LAST_NAMES)
             full_name = f"{first} {last}"
-            merchant_id, _ = random.choice(self.MERCHANTS)
+            merchant_id, _ = self.rng.choice(self.MERCHANTS)
             
-            gross = round(random.uniform(800, 8500), 2)
+            gross = round(self.rng.uniform(800, 8500), 2)
             rzp_fee = round(gross * 0.018, 2)
             net_amt = round(gross - rzp_fee, 2)
             
-            order_id = f"order_{uuid.uuid4().hex[:9]}"
+            order_id = f"order_{self.rng.getrandbits(36):09x}"
             inv_ref = f"INV{global_txn_idx}"
             bank_txn_id = f"BNK-{txn_date.strftime('%Y%m%d')}-{global_txn_idx}"
             ledger_id = f"LEDG-{ledger_idx:06d}"
@@ -398,7 +400,7 @@ class SyntheticDataGenerator:
                 "date": date_str,
                 "amount": net_amt,
                 "type": "credit",
-                "counterparty_account": f"XXXXXX{random.randint(1000, 9999)}",
+                "counterparty_account": f"XXXXXX{self.rng.randint(1000, 9999)}",
                 "narration": narration,
                 "utr_number": "" # Deliberately empty UTR
             })
@@ -432,23 +434,23 @@ class SyntheticDataGenerator:
         # -------------------------------------------------------------
         for i in range(bank_orphan_count):
             global_txn_idx += 1
-            day_offset = random.randint(0, 4)
+            day_offset = self.rng.randint(0, 4)
             txn_date = base_dt + timedelta(days=day_offset)
             date_str = txn_date.strftime("%Y-%m-%d")
             
             bank_txn_id = f"BNK-{txn_date.strftime('%Y%m%d')}-{global_txn_idx}"
-            orphan_amount = round(random.uniform(1200, 9000), 2)
+            orphan_amount = round(self.rng.uniform(1200, 9000), 2)
             orphan_utr = self._generate_utr(txn_date, global_txn_idx)
             
             # Unknown direct credit or mystery deposit
-            narration = f"DIRECT-DEP-UNKNOWN-REMITTER-{random.randint(100000, 999999)}"
+            narration = f"DIRECT-DEP-UNKNOWN-REMITTER-{self.rng.randint(100000, 999999)}"
             
             bank_records.append({
                 "bank_txn_id": bank_txn_id,
                 "date": date_str,
                 "amount": orphan_amount,
                 "type": "credit",
-                "counterparty_account": f"XXXXXX{random.randint(1000, 9999)}",
+                "counterparty_account": f"XXXXXX{self.rng.randint(1000, 9999)}",
                 "narration": narration,
                 "utr_number": orphan_utr
             })
@@ -469,19 +471,19 @@ class SyntheticDataGenerator:
         # -------------------------------------------------------------
         for i in range(ledger_orphan_count):
             ledger_idx += 1
-            day_offset = random.randint(0, 3)
+            day_offset = self.rng.randint(0, 3)
             txn_date = base_dt + timedelta(days=day_offset)
             date_str = txn_date.strftime("%Y-%m-%d")
             
-            first = random.choice(self.FIRST_NAMES)
-            last = random.choice(self.LAST_NAMES)
+            first = self.rng.choice(self.FIRST_NAMES)
+            last = self.rng.choice(self.LAST_NAMES)
             full_name = f"{first} {last}"
-            merchant_id, _ = random.choice(self.MERCHANTS)
+            merchant_id, _ = self.rng.choice(self.MERCHANTS)
             
-            gross = round(random.uniform(2000, 15000), 2)
+            gross = round(self.rng.uniform(2000, 15000), 2)
             rzp_fee = round(gross * 0.02, 2)
             ledger_id = f"LEDG-{ledger_idx:06d}"
-            order_id = f"order_{uuid.uuid4().hex[:9]}"
+            order_id = f"order_{self.rng.getrandbits(36):09x}"
             inv_ref = f"INV{ledger_idx}"
             
             ledger_records.append({
@@ -514,19 +516,19 @@ class SyntheticDataGenerator:
         # -------------------------------------------------------------
         for i in range(ledger_failed_count):
             ledger_idx += 1
-            day_offset = random.randint(0, 3)
+            day_offset = self.rng.randint(0, 3)
             txn_date = base_dt + timedelta(days=day_offset)
             date_str = txn_date.strftime("%Y-%m-%d")
             
-            first = random.choice(self.FIRST_NAMES)
-            last = random.choice(self.LAST_NAMES)
+            first = self.rng.choice(self.FIRST_NAMES)
+            last = self.rng.choice(self.LAST_NAMES)
             full_name = f"{first} {last}"
-            merchant_id, _ = random.choice(self.MERCHANTS)
+            merchant_id, _ = self.rng.choice(self.MERCHANTS)
             
-            gross = round(random.uniform(1000, 5000), 2)
+            gross = round(self.rng.uniform(1000, 5000), 2)
             rzp_fee = round(gross * 0.02, 2)
             ledger_id = f"LEDG-{ledger_idx:06d}"
-            order_id = f"order_{uuid.uuid4().hex[:9]}"
+            order_id = f"order_{self.rng.getrandbits(36):09x}"
             inv_ref = f"INV{ledger_idx}"
             
             ledger_records.append({
@@ -555,9 +557,9 @@ class SyntheticDataGenerator:
             })
 
         # Shuffle lists to prevent positional bias
-        random.shuffle(bank_records)
-        random.shuffle(ledger_records)
-        random.shuffle(settlement_records)
+        self.rng.shuffle(bank_records)
+        self.rng.shuffle(ledger_records)
+        self.rng.shuffle(settlement_records)
         
         df_bank = pd.DataFrame(bank_records)
         df_ledger = pd.DataFrame(ledger_records)

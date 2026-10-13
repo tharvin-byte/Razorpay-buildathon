@@ -14,9 +14,6 @@ def chat_assistant(req: ChatRequest):
     if session.status != "completed" or not session.summary:
         raise HTTPException(status_code=409, detail="Run must be completed before asking questions")
 
-    if not session.summary and session.results and session.orchestrator:
-        session.summary = session.orchestrator.get_summary(run_id=req.run_id)
-
     answer, relevant_ids = session.assistant.answer_query(
         question=req.question,
         summary=session.summary,

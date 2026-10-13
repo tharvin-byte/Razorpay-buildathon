@@ -20,7 +20,7 @@
 # HOW IT IS NOW (with this file):
 #   - Backend: https://reconx-backend.onrender.com  (auto-built, always live, free HTTPS)
 #   - Frontend: https://reconx-frontend.onrender.com  (global CDN, always live, free HTTPS)
-#   - Anyone in the world can access your live app via a public URL.
+#   - Public demo deployment. Do not configure it with live financial data.
 
 services:
   # ─────────────────────────────────────────────
@@ -51,10 +51,12 @@ services:
     #     In production, files never change, so --reload wastes CPU and slows startup.
     startCommand: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 
-    # CORS: The backend's CORS is already set to allow_origins=["*"] in main.py,
-    # so no extra headers are needed here.
+    # Configure RECONX_ALLOWED_ORIGINS with the exact deployed frontend origin.
 
     envVars:
+      # Set this to the exact deployed frontend origin. The backend rejects wildcard origins.
+      - key: RECONX_ALLOWED_ORIGINS
+        sync: false
       # If the user has a Gemini API key, they can add it in Render dashboard.
       # It is optional — ReconX runs 100% without it (falls back to rule-based engine).
       - key: GEMINI_API_KEY

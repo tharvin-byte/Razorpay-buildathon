@@ -19,36 +19,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api';
 import PageHeader from '../components/PageHeader';
-
-function AnimatedNumber({ value }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    const startValue = displayValue;
-    const endValue = value;
-    const duration = 800;
-
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(startValue + (endValue - startValue) * easeProgress);
-
-      if (progress < 1) {
-        window.requestAnimationFrame(step);
-      }
-    };
-
-    window.requestAnimationFrame(step);
-  }, [value]);
-
-  return (
-    <span>
-      ₹{displayValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-    </span>
-  );
-}
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function ErpVouchersView({ runId, onToast }) {
   const [vouchersData, setVouchersData] = useState(null);
@@ -57,7 +28,6 @@ export default function ErpVouchersView({ runId, onToast }) {
   const [filterType, setFilterType] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
-  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'synced'
   const [isExportingXml, setIsExportingXml] = useState(false);
 
   useEffect(() => {
@@ -127,20 +97,6 @@ export default function ErpVouchersView({ runId, onToast }) {
     }
   };
 
-  const handleBatchSync = () => {
-    setSyncStatus('syncing');
-    setTimeout(() => {
-      setSyncStatus('synced');
-      if (onToast) {
-        onToast({
-          title: 'Direct ERP Sync Successful',
-          message: `${vouchersData?.vouchers?.length || 0} Journal Vouchers posted to Connected ERP instance.`
-        });
-      }
-      setTimeout(() => setSyncStatus('idle'), 3000);
-    }, 1500);
-  };
-
   const vouchers = vouchersData?.vouchers || [];
 
   const filteredVouchers = vouchers.filter((v) => {
@@ -150,8 +106,8 @@ export default function ErpVouchersView({ runId, onToast }) {
     return (
       v.voucher_id.toLowerCase().includes(q) ||
       v.counterparty_name.toLowerCase().includes(q) ||
-      v.narration.toLowerCase().includes(q) ||
-      v.discrepancy_type.toLowerCase().includes(q)
+      (v.adjustment_reason || '').toLowerCase().includes(q) ||
+      (v.discrepancy_type || '').toLowerCase().includes(q)
     );
   });
 
@@ -176,11 +132,11 @@ export default function ErpVouchersView({ runId, onToast }) {
         icon={FileSpreadsheet}
         accentColor="#A78BFA"
         badges={[
-          { label: 'Autonomous Accounting Engine', variant: 'clean' },
-          { label: 'Double-Entry Invariant Guarded', variant: 'expected' },
+          { label: 'Generated from run data', variant: 'clean' },
+          { label: vouchers.length === 0 ? 'No voucher entries' : vouchersData?.all_balanced ? 'Voucher totals balance' : 'Balance check required', variant: vouchersData?.all_balanced ? 'expected' : 'danger' },
         ]}
         title="Automated ERP Journal Vouchers"
-        description="Zero manual accounting reconciliation. Automatically generated double-entry journal vouchers ready for 1-click import into Tally Prime, SAP ECC/S4, Zoho Books, and Oracle NetSuite."
+        description="Review generated journal entries and export the available Tally XML payload. No direct ERP connection is configured. Entries requiring accounting interpretation are held for manual review."
         rightSlot={
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <motion.button
@@ -204,51 +160,7 @@ export default function ErpVouchersView({ runId, onToast }) {
               )}
             </motion.button>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleBatchSync}
-              disabled={syncStatus === 'syncing'}
-              className="btn btn-primary"
-              style={{ padding: '8px 16px', fontSize: '12px', borderRadius: '7px', display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <AnimatePresence mode="wait">
-                {syncStatus === 'syncing' ? (
-                  <motion.span
-                    key="syncing"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <RefreshCw size={13} className="spin" />
-                    <span>Posting to ERP...</span>
-                  </motion.span>
-                ) : syncStatus === 'synced' ? (
-                  <motion.span
-                    key="synced"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fff' }}
-                  >
-                    <Check size={13} />
-                    <span>Synced with ERP</span>
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    key="idle"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Send size={13} />
-                    <span>Batch Post to ERP</span>
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </motion.button>
+            <span className="badge badge-warning">Direct ERP posting is not configured</span>
           </div>
         }
       />
@@ -294,7 +206,7 @@ export default function ErpVouchersView({ runId, onToast }) {
           <div className="kpi-value font-mono" style={{ color: '#fff' }}>
             {vouchers.length}
           </div>
-          <div className="kpi-subtext">100% balanced entries</div>
+          <div className="kpi-subtext">{vouchers.length === 0 ? 'No entries available to validate' : vouchersData?.all_balanced ? 'All exported voucher totals balance' : 'Balance validation required'}</div>
         </motion.div>
 
         <motion.div
@@ -325,7 +237,7 @@ export default function ErpVouchersView({ runId, onToast }) {
           <div className="kpi-value" style={{ color: '#93C5FD', fontSize: '15px' }}>
             Tally · SAP · Zoho · NetSuite
           </div>
-          <div className="kpi-subtext">Multi-standard compliant</div>
+          <div className="kpi-subtext">XML export available; no ERP connector configured</div>
         </motion.div>
       </motion.div>
 
@@ -527,10 +439,10 @@ export default function ErpVouchersView({ runId, onToast }) {
                 {/* Narration Quote */}
                 <div style={{ background: 'rgba(255, 255, 255, 0.025)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '10px 12px', marginBottom: '16px' }}>
                   <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '2px' }}>
-                    Statutory Accounting Narration
+                    Voucher Narration
                   </div>
                   <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    {selectedVoucher.narration}
+                    {selectedVoucher.narration || selectedVoucher.adjustment_reason || 'No narration available'}
                   </div>
                 </div>
 

@@ -42,11 +42,11 @@ export default function ReportView({ runId }) {
         icon={ShieldCheck}
         accentColor="#10B981"
         badges={[
-          { label: 'Statutory Compliance Dossier', variant: 'clean' },
+          { label: 'Operational run report', variant: 'clean' },
           { label: `Run ${runId}`, variant: 'expected' },
         ]}
-        title="Financial Controller Audit Report"
-        description={`Official audit-grade summary for Run ${runId} (Generated on ${report?.generated_at || '—'})`}
+        title="Reconciliation Run Report"
+        description={`Computed summary for Run ${runId} (Generated on ${report?.generated_at || '—'})`}
         rightSlot={
           <div style={{ display: 'flex', gap: '10px' }}>
             <button className="btn-secondary" onClick={() => handleDownload('json')}>
@@ -55,7 +55,7 @@ export default function ReportView({ runId }) {
             </button>
             <button className="btn-primary" onClick={() => handleDownload('csv')}>
               <Download size={14} />
-              <span>Export Audit CSV</span>
+              <span>Export Results CSV</span>
             </button>
           </div>
         }
@@ -77,7 +77,7 @@ export default function ReportView({ runId }) {
           </div>
           <div style={{ textAlign: 'right' }}>
             <span className="badge badge-clean">
-              <ShieldCheck size={14} /> Certified Compliant (Stanford CRC α ≤ 0.001)
+              <ShieldCheck size={14} /> Generated run summary
             </span>
           </div>
         </div>
@@ -93,8 +93,8 @@ export default function ReportView({ runId }) {
               <span className="metric-value font-mono">{s?.total_transactions}</span>
             </div>
             <div className="metric-card">
-              <span className="metric-label">Overall Match Rate</span>
-              <span className="metric-value font-mono" style={{ color: 'var(--semantic-success)' }}>{s?.match_rate}</span>
+              <span className="metric-label">Bank Match Rate</span>
+              <span className="metric-value font-mono" style={{ color: 'var(--semantic-success)' }}>{s?.bank_match_rate}</span>
             </div>
             <div className="metric-card">
               <span className="metric-label">Discrepancies Flagged</span>

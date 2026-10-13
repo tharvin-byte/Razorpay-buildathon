@@ -15,36 +15,7 @@ import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
 import TransactionInspectorDrawer from '../components/TransactionInspectorDrawer';
 import PageHeader from '../components/PageHeader';
-
-function AnimatedNumber({ value }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    const startValue = displayValue;
-    const endValue = value;
-    const duration = 650;
-
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(startValue + (endValue - startValue) * easeProgress);
-
-      if (progress < 1) {
-        window.requestAnimationFrame(step);
-      }
-    };
-
-    window.requestAnimationFrame(step);
-  }, [value]);
-
-  return (
-    <span>
-      ₹{displayValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-    </span>
-  );
-}
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function ExceptionsView({ runId, setView, selectedTxnId, setSelectedTxnId, onToast, onNavigateTab }) {
   const [allExceptions, setAllExceptions] = useState([]);
@@ -131,20 +102,20 @@ export default function ExceptionsView({ runId, setView, selectedTxnId, setSelec
           accentColor="#F87171"
           badges={[
             { label: 'Zero Guessing Policy', variant: 'discrepancy' },
-            { label: '100% Audit Traceable', variant: 'clean' },
+            { label: 'Exception records available', variant: 'clean' },
           ]}
           title="Honest Exception & Orphan Registry"
-          description={<>In financial accounting, forcing a guess is a regulatory violation. ReconX isolates unresolved records into two auditable buckets: <strong>Ledger Orphans</strong> (unsettled receivables) and <strong>Bank Orphans</strong> (unidentified credits).</>}
+          description={<>Records without an accepted match are separated by source side for review: <strong>Ledger Exceptions</strong> and <strong>Bank Exceptions</strong>.</>}
         />
 
         {/* KPI Cards Grid with Live Odometers */}
         <div className="kpi-grid" style={{ marginBottom: '24px' }}>
           <div className="kpi-card">
-            <div className="kpi-label">Quarantined Risk Capital</div>
+            <div className="kpi-label">Observed Exception Source Amounts</div>
             <div className="kpi-value font-mono" style={{ color: '#F87171' }}>
               <AnimatedNumber value={totalQuarantinedCapital} />
             </div>
-            <div className="kpi-subtext">Isolated from statutory ledger balance</div>
+            <div className="kpi-subtext">Sum of amounts on exception records; not an escrow balance</div>
           </div>
 
           <div className="kpi-card">
@@ -164,12 +135,12 @@ export default function ExceptionsView({ runId, setView, selectedTxnId, setSelec
           </div>
 
           <div className="kpi-card">
-            <div className="kpi-label">Statutory Compliance Status</div>
+            <div className="kpi-label">Exception Review Queue</div>
             <div className="kpi-value" style={{ color: '#34D399', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <CheckCircle2 size={16} />
-              <span>100% Quarantine Verified</span>
+              <span>{allExceptions.length} records</span>
             </div>
-            <div className="kpi-subtext">Zero forced reconciliation guesses</div>
+            <div className="kpi-subtext">Unmatched records shown for review</div>
           </div>
         </div>
 

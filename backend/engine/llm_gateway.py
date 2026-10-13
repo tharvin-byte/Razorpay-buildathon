@@ -28,6 +28,9 @@ def get_gemini_client() -> Optional[Any]:
     """
     Returns a cached Gemini API client instance if a valid key is configured.
     """
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return None
+
     global _client, _client_initialized
     if not _client_initialized:
         _client_initialized = True
@@ -46,10 +49,11 @@ def get_gemini_client() -> Optional[Any]:
     return _client
 
 
-def generate_content(prompt: str, model: str = "gemini-2.5-flash") -> Optional[str]:
+def generate_content(prompt: str, model: Optional[str] = None) -> Optional[str]:
     """
     Safely generates text content using the Gemini client with PII redaction and error handling.
     """
+    selected_model = model or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
     client = get_gemini_client()
     if not client:
         return None
@@ -57,7 +61,7 @@ def generate_content(prompt: str, model: str = "gemini-2.5-flash") -> Optional[s
     try:
         sanitized_prompt = redact_pii(prompt)
         response = client.models.generate_content(
-            model=model,
+            model=selected_model,
             contents=sanitized_prompt
         )
         if response and hasattr(response, "text") and response.text:

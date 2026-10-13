@@ -56,9 +56,9 @@ export default function CommandPalette({
     { id: 'sources', title: 'Data Sources & Schema Registry', group: 'System', icon: Database, shortcut: 'O' },
     { id: 'compliance', title: 'Audit Trail & Merkle Compliance Seal', group: 'System', icon: ShieldCheck, shortcut: 'M' },
     { id: 'upload', title: 'Upload & Ingest New Batch', group: 'System', icon: Upload, shortcut: 'U' },
-    { id: 'report', title: 'Statutory Audit Dossier Export', group: 'System', icon: FileText, shortcut: 'F' },
+    { id: 'report', title: 'Reconciliation Run Report Export', group: 'System', icon: FileText, shortcut: 'F' },
     { id: 'action-batch', title: 'Run New Synthetic Reconciliation Batch', group: 'Quick Actions', icon: RefreshCw, action: 'batch' },
-    { id: 'action-export', title: 'Download Statutory Audit Dossier (PDF)', group: 'Quick Actions', icon: FileText, action: 'export' }
+    { id: 'action-export', title: 'Download Reconciliation Run Report', group: 'Quick Actions', icon: FileText, action: 'export' }
   ];
 
   const filtered = commandItems.filter(item =>

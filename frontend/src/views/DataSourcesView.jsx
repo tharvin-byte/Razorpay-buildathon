@@ -16,32 +16,7 @@ import {
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
 import PageHeader from '../components/PageHeader';
-
-function AnimatedNumber({ value }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    let startTimestamp = null;
-    const startValue = displayValue;
-    const endValue = value;
-    const duration = 650;
-
-    const step = (timestamp) => {
-      if (!startTimestamp) startTimestamp = timestamp;
-      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setDisplayValue(startValue + (endValue - startValue) * easeProgress);
-
-      if (progress < 1) {
-        window.requestAnimationFrame(step);
-      }
-    };
-
-    window.requestAnimationFrame(step);
-  }, [value]);
-
-  return <span>{Math.round(displayValue).toLocaleString('en-IN')}</span>;
-}
+import AnimatedNumber from '../components/AnimatedNumber';
 
 export default function DataSourcesView({ runId }) {
   const [sources, setSources] = useState(null);
@@ -100,7 +75,7 @@ export default function DataSourcesView({ runId }) {
           <div className="kpi-card">
             <div className="kpi-label">TOTAL INGESTED ROWS</div>
             <div className="kpi-value font-mono" style={{ color: '#A78BFA' }}>
-              <AnimatedNumber value={totalIngestedRows} /> Rows
+              <AnimatedNumber value={totalIngestedRows} prefix="" decimals={0} /> Rows
             </div>
             <div className="kpi-subtext">Across 3 connected ledgers</div>
           </div>

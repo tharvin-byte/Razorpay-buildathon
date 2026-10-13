@@ -88,7 +88,7 @@ export default function Sidebar({ currentView, setView, summary }) {
         { id: "assistant", label: "AI Treasury Copilot", icon: MessageSquare },
         { id: "agents", label: "Multi-Agent Trace", icon: Cpu },
         { id: "compliance", label: "Audit & Cryptography", icon: ShieldCheck },
-        { id: "report", label: "Statutory Dossier Export", icon: FileText }
+        { id: "report", label: "Run Report Export", icon: FileText }
       ]
     }
   ];
@@ -435,12 +435,12 @@ export default function Sidebar({ currentView, setView, summary }) {
             background: 'rgba(12, 18, 32, 0.4)',
             flexShrink: 0
           }}
-          title="Stanford CRC α ≤ 0.001 Certified"
+          title="Configured reconciliation score threshold"
         >
           <ShieldCheck size={14} color="var(--semantic-success)" style={{ flexShrink: 0 }} />
           {!isSidebarCompact && (
             <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Stanford CRC α ≤ 0.001 Certified
+              Reconciliation scoring enabled
             </span>
           )}
         </div>
