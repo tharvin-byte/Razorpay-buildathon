@@ -5,16 +5,8 @@ import {
   Copy,
   Check,
   CheckCircle2,
-  AlertTriangle,
-  ArrowRight,
-  Sparkles,
-  Layers,
-  Send,
-  Building,
   RefreshCw,
-  Search,
-  ExternalLink,
-  Code
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api';

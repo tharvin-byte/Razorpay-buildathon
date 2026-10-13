@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
-  CheckCircle2,
-  AlertTriangle,
-  AlertOctagon,
   ChevronRight,
   LayoutGrid,
   List,
   Layers,
-  ArrowUpDown,
-  SlidersHorizontal,
-  Sparkles,
-  Eye,
   ArrowUp
 } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';

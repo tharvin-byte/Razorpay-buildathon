@@ -10,18 +10,11 @@ import {
   Copy,
   Check,
   FileText,
-  ExternalLink,
   Hash,
-  Layers,
   Download,
-  Clock,
-  ArrowLeftRight,
   Building2,
   Receipt,
   CheckCheck,
-  Percent,
-  Cpu,
-  Zap,
   Scale,
   FileCheck
 } from 'lucide-react';

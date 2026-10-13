@@ -2,16 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Database,
   FileSpreadsheet,
-  Eye,
-  Info,
   CheckCircle2,
-  Layers,
-  Download,
-  Search,
-  Server,
-  Zap,
-  ShieldCheck,
-  RefreshCw
+  Server
 } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { api } from '../api';

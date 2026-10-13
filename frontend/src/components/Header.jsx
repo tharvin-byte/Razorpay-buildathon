@@ -1,6 +1,10 @@
 import React from 'react';
-import { Activity, RefreshCw, Sliders, Building2, Search, Download, ShieldCheck, Plus, CheckCircle2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import {
+  RefreshCw,
+  Sliders,
+  Search,
+  Download
+} from 'lucide-react';
 
 export default function Header({ runId, status, summary, onRunNewBatch, isRecomputing, onOpenCommandPalette, onExportReport }) {
   const isRunning = status?.status === "running" || isRecomputing;

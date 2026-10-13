@@ -2,28 +2,16 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Sliders,
   CheckCircle2,
-  AlertTriangle,
-  ShieldCheck,
   Zap,
-  Layers,
-  Play,
   Check,
-  ArrowRight,
-  Shield,
   Sparkles,
   ChevronRight,
-  Settings2,
-  Percent,
   GitCompare,
   TrendingUp,
   Lock,
-  Receipt,
-  RefreshCw,
-  IndianRupee,
-  Activity,
-  ArrowUpRight
+  RefreshCw
 } from 'lucide-react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api';
 import PageHeader from '../components/PageHeader';
 

@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   AlertTriangle,
-  Clock,
-  Percent,
-  RefreshCcw,
-  Layers,
-  Hash,
-  ArrowRight,
   CheckCircle2,
-  TrendingDown,
   ChevronRight
 } from 'lucide-react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
 import TransactionInspectorDrawer from '../components/TransactionInspectorDrawer';
 import PageHeader from '../components/PageHeader';

@@ -1,22 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Sliders,
   CheckCircle2,
-  AlertTriangle,
-  Play,
-  Plus,
-  Trash2,
-  Zap,
-  ShieldCheck,
-  ToggleLeft,
-  ToggleRight,
-  Sparkles,
-  ArrowRight,
-  RotateCcw,
-  Info,
-  Scale
+  Zap
 } from 'lucide-react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
 import PageHeader from '../components/PageHeader';
 

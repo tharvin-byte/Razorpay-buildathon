@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
   Layers,
-  GitCompare,
   FileCheck,
   Scale,
   Cpu,
@@ -15,7 +14,6 @@ import {
   Sparkles,
   RefreshCw,
   X,
-  ArrowRight,
   CornerDownLeft,
   Database,
   Building2,

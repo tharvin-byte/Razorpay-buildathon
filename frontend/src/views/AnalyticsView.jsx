@@ -1,22 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  BarChart3,
   TrendingUp,
   AlertTriangle,
-  ShieldCheck,
-  Zap,
-  Clock,
-  Layers,
-  ArrowUpRight,
-  Filter,
-  DollarSign,
-  PieChart,
-  Percent,
-  CheckCircle2,
-  Cpu,
-  Sparkles,
-  ChevronRight,
-  Shield
+  PieChart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../api';

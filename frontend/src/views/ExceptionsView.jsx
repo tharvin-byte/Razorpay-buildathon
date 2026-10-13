@@ -1,17 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  AlertOctagon,
   ShieldAlert,
-  ArrowRight,
-  ShieldCheck,
   CheckCircle2,
-  Lock,
-  Layers,
-  AlertTriangle,
-  ExternalLink,
   ChevronRight
 } from 'lucide-react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, LayoutGroup } from 'framer-motion';
 import { api } from '../api';
 import TransactionInspectorDrawer from '../components/TransactionInspectorDrawer';
 import PageHeader from '../components/PageHeader';

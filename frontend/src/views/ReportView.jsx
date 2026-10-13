@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, ShieldCheck, CheckCircle2, AlertTriangle, AlertOctagon, Printer } from 'lucide-react';
+import { Download, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { api } from '../api';
 import PageHeader from '../components/PageHeader';

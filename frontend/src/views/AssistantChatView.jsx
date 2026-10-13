@@ -1,24 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  MessageSquare,
   Send,
   Bot,
   User,
   Sparkles,
   Shield,
   ArrowRight,
-  CornerDownLeft,
   Copy,
   Check,
-  FileText,
-  AlertCircle,
-  Database,
-  Layers,
-  CheckCircle2,
-  Cpu,
-  Zap,
-  RotateCcw,
-  Sliders
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';

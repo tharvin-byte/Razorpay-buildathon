@@ -1,6 +1,11 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  X
+} from 'lucide-react';
 
 export default function ToastContainer({ toasts, onDismiss }) {
   return (

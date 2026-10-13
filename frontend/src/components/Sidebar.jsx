@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import {
   UploadCloud,
   Database,
-  Layers,
-  Sparkles,
   AlertTriangle,
   AlertOctagon,
   Sliders,
@@ -16,7 +14,6 @@ import {
   Building2,
   FileCheck,
   Scale,
-  GitCompare,
   LayoutGrid,
   ChevronDown,
   ChevronRight,

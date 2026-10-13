@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Database, Zap, Shield, Sparkles, CheckCircle2, Cpu } from 'lucide-react';
+import { Zap, CheckCircle2, Cpu } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import CommandPalette from './components/CommandPalette';
