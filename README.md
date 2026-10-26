@@ -75,46 +75,28 @@
 
 ## 🧩 System Architecture
 
-ReconX is a **3-layer system**: a React 19 frontend cockpit, a FastAPI backend with a multi-phase orchestrator,
-and a 6-agent specialist layer covering every domain of financial reconciliation.
+ReconX is structured into a clean **3-tier architecture**: a React 19 frontend cockpit, a modular FastAPI backend, and an autonomous 3-phase reconciliation orchestrator backed by deterministic risk control.
 
 ```
 +-------------------------------------------------------------+
-|                  React 19 + Vite Frontend                    |
+|                  React 19 + Vite Frontend                   |
 |         15 Dashboard Views  .  Centralised api.js           |
 +----------------------+--------------------------------------+
                        | HTTP / REST  (CORS-gated)
 +----------------------v--------------------------------------+
-|                  FastAPI Backend  (main.py)                  |
-|   5 Routers: runs . reconciliation . assistant . reports     |
+|                  FastAPI Backend  (main.py)                 |
+|   5 Routers: runs . reconciliation . assistant . reports    |
 |                     . actions                               |
 +-------------------------------------------------------------+
 |           ReconciliationOrchestrator  (3 Phases)            |
 |  Phase 1  Ingest and Normalise  -> matcher.py + scorer.py   |
-|  Phase 2  Bipartite Assignment  -> decision_maker_agent.py  |
+|  Phase 2  Bipartite Assignment  -> DecisionMaker mutex      |
 |  Phase 3  Audit and Seal        -> conformal_verifier.py    |
-+-------------------------------------------------------------+
-|                  6 Specialist Agents                         |
-|  NarrationParser . DecisionMaker . Discrepancy . ERPVoucher |
-|  BankDispute (stub) . Assistant (Gemini / rule-based)       |
 +-------------------------------------------------------------+
 |           Offline Research / Benchmark Suite                |
 |           vector_tensor.py  .  graph_solver.py              |
 +-------------------------------------------------------------+
 ```
-
----
-
-## 🤖 6-Agent Specialist Layer
-
-| # | Agent | File | Responsibility |
-|:---:|:---|:---|:---|
-| 1 | **DecisionMaker** | `decision_maker_agent.py` | Autonomous 1:1 mutex claim resolution. Routes low-confidence gaps (delta < 0.08) to quarantine. |
-| 2 | **NarrationParser** | `narration_parser_agent.py` | Extracts UPI handles, IMPS codes, POS terminal IDs, and MDR tags from unstructured Indian bank narration strings via regex + subword tokenisation. |
-| 3 | **Discrepancy** | `discrepancy_agent.py` | MDR (2%) + GST (18%) forensic fee decomposition; timing-lag identification; field-level delta summaries. |
-| 4 | **ERP Voucher** | `erp_voucher_agent.py` | Generates balanced double-entry journal vouchers in **Tally XML** and **Zoho Books JSON**. Unsupported treatments are held for manual review. |
-| 5 | **Bank Dispute** | `bank_dispute_agent.py` | Compatibility stub returning empty dispute lists. Preserved as an integration surface for future NPCI Form-1 statutory filings. |
-| 6 | **Assistant** | `assistant_agent.py` | RAG Financial Copilot powered by **Gemini 2.5 Flash**. Automatically falls back to a deterministic rule-based engine when no API key is present. |
 
 ---
 
@@ -124,7 +106,7 @@ and a 6-agent specialist layer covering every domain of financial reconciliation
 - Accepts up to **3 sources**: `bank_df`, `ledger_df`, `settlement_df`
 - `_sanitize_df()` strips NaN/null strings, trims whitespace, and enforces typed columns
 - Builds an **O(1) inverted index** over UTRs, Order IDs, and timestamps via `MatcherTool`
-- `NarrationParserAgent` tokenises bank narration strings into structured payment signals
+- `NarrationParser` tokenises bank narration strings into structured payment signals
 
 ### Phase 2 · Bipartite Assignment
 - `ScoringTool` produces a **5-channel weighted score** per candidate pair:
@@ -172,7 +154,7 @@ All endpoints are rooted at `http://127.0.0.1:8000` locally or the Render base U
 |:---|:---:|:---|
 | `/upload` | `POST` | Seed a synthetic demo run (70 bank + 100 ledger records with ground truth) |
 | `/run/{run_id}` | `POST` | Trigger the full 3-phase reconciliation pipeline |
-| `/run/{run_id}/status` | `GET` | Real-time progress: current agent stage and processed count |
+| `/run/{run_id}/status` | `GET` | Real-time progress: current pipeline stage and processed count |
 | `/run/{run_id}/recompute` | `POST` | Recompute decisions at a new confidence threshold without re-running |
 | `/run/{run_id}/threshold_sweep` | `GET` | Precision/recall curve across the full threshold range |
 
@@ -182,7 +164,7 @@ All endpoints are rooted at `http://127.0.0.1:8000` locally or the Render base U
 |:---|:---:|:---|
 | `/run/{run_id}/summary` | `GET` | Match/exception counts, rates, and Merkle root digest |
 | `/run/{run_id}/transactions` | `GET` | Filtered transaction list with confidence scores |
-| `/run/{run_id}/transaction/{id}` | `GET` | Single-transaction forensic agent trace |
+| `/run/{run_id}/transaction/{id}` | `GET` | Single-transaction forensic decision trace |
 | `/run/{run_id}/discrepancies` | `GET` | MDR fee splits, GST deductions, timing lags |
 | `/run/{run_id}/exceptions` | `GET` | Bank orphans and ledger orphans |
 | `/run/{run_id}/erp-vouchers` | `GET` | Double-entry accounting vouchers (Tally / Zoho) |
@@ -397,7 +379,7 @@ Conformal calibration (Angelopoulos et al., Stanford/UC Berkeley) is applied **o
 
 | Phase | Target |
 |:---|:---|
-| **Phase 1** (current) | 3-phase pipeline, 6 agents, 15 React views, Merkle sealing, Gemini copilot, offline research suite, cloud deployment |
+| **Phase 1** (current) | 3-phase pipeline, 15 React views, Merkle sealing, Gemini copilot, offline research suite, cloud deployment |
 | **Phase 2** | PostgreSQL/TimescaleDB persistence, Apache Kafka streaming ingestion |
 | **Phase 3** | Redis distributed lock (Redlock) for horizontal multi-worker scaling |
 | **Phase 4** | Direct SFTP/REST connectors for HDFC/ICICI host-to-host nodal feeds; SAP OData voucher posting |
